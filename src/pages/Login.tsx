@@ -1,0 +1,161 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Paper,
+  CircularProgress,
+  Alert
+} from '@mui/material';
+import LockIcon from '@mui/icons-material/Lock';
+import HirataLogo from '../assets/Hirata Logo.svg';
+
+interface Configuracao {
+  id: string;
+  senhaHash?: string;
+  nomeEmpresa?: string;
+  endereco?: string;
+  telefone?: string;
+  numeroAutorizacao?: string;
+}
+
+interface LoginProps {
+  onLogin: () => void;
+}
+
+// cyrb53 — fast, consistent, works in any browser context (no secure origin needed)
+function hashPassword(str: string): string {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+}
+
+const Login = ({ onLogin }: LoginProps) => {
+  const [config, setConfig] = useState<Configuracao | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [senha, setSenha] = useState('');
+  const [confirmar, setConfirmar] = useState('');
+  const [erro, setErro] = useState('');
+  const [primeiroUso, setPrimeiroUso] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    axios.get('http://localhost:3001/configuracoes')
+      .then(res => {
+        const items: Configuracao[] = res.data;
+        if (items.length === 0 || !items[0].senhaHash) {
+          setPrimeiroUso(true);
+          setConfig(items[0] ?? null);
+        } else {
+          setConfig(items[0]);
+        }
+      })
+      .catch(() => setPrimeiroUso(true))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSubmit = async () => {
+    setErro('');
+    if (!senha) { setErro('Digite a senha'); return; }
+
+    setSalvando(true);
+    try {
+      const hash = hashPassword(senha);
+
+      if (primeiroUso) {
+        if (senha !== confirmar) { setErro('Senhas não coincidem'); return; }
+        if (senha.length < 4) { setErro('Senha deve ter ao menos 4 caracteres'); return; }
+
+        if (config?.id) {
+          await axios.put(`http://localhost:3001/configuracoes/${config.id}`, { ...config, senhaHash: hash });
+        } else {
+          await axios.post('http://localhost:3001/configuracoes', { senhaHash: hash });
+        }
+        sessionStorage.setItem('authenticated', 'true');
+        onLogin();
+      } else {
+        if (hash === config?.senhaHash) { // compare hashes
+          sessionStorage.setItem('authenticated', 'true');
+          onLogin();
+        } else {
+          setErro('Senha incorreta');
+        }
+      }
+    } catch {
+      setErro('Erro ao processar. Verifique se o servidor está rodando.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSubmit();
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5' }}>
+      <Paper sx={{ p: 4, maxWidth: 400, width: '100%', textAlign: 'center' }} elevation={4}>
+        <img src={HirataLogo} alt="Logo" style={{ height: 80, marginBottom: 16 }} />
+        <Typography variant="h5" fontWeight="bold" mb={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+          <LockIcon />
+          {primeiroUso ? 'Definir Senha de Acesso' : 'Acesso ao Sistema'}
+        </Typography>
+        {primeiroUso && (
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Primeiro acesso — defina uma senha para proteger o sistema.
+          </Typography>
+        )}
+        {erro && <Alert severity="error" sx={{ mb: 2, textAlign: 'left' }}>{erro}</Alert>}
+        <TextField
+          fullWidth
+          label="Senha"
+          type="password"
+          value={senha}
+          onChange={e => setSenha(e.target.value)}
+          onKeyDown={handleKeyDown}
+          sx={{ mb: 2 }}
+          autoFocus
+        />
+        {primeiroUso && (
+          <TextField
+            fullWidth
+            label="Confirmar Senha"
+            type="password"
+            value={confirmar}
+            onChange={e => setConfirmar(e.target.value)}
+            onKeyDown={handleKeyDown}
+            sx={{ mb: 2 }}
+          />
+        )}
+        <Button
+          variant="contained"
+          fullWidth
+          size="large"
+          onClick={handleSubmit}
+          disabled={salvando}
+          startIcon={salvando ? <CircularProgress size={18} color="inherit" /> : <LockIcon />}
+        >
+          {primeiroUso ? 'Definir Senha' : 'Entrar'}
+        </Button>
+      </Paper>
+    </Box>
+  );
+};
+
+export default Login;

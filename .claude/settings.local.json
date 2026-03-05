@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gemini:*)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npx tsc --noEmit 2>&1)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npm run build 2>&1)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npm run dev 2>&1)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npm run json-server 2>&1)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npx eslint src/ --ext .ts,.tsx 2>&1)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npx tsc --noEmit 2>&1 && npx eslint src/ --ext .ts,.tsx 2>&1)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npx eslint src/ --ext .ts,.tsx --max-warnings 0 2>&1)",
+      "Bash(cd D:/Programacao/oficina-mecanica && npm run build 2>&1 && npx eslint src/ --ext .ts,.tsx --max-warnings 0 2>&1)",
+      "Bash(npx kill-port:*)",
+      "Bash(curl:*)",
+      "Bash(cd \"D:\\\\Programacao\\\\oficina-mecanica\" && npm run build 2>&1)",
+      "Bash(cd \"D:\\\\Programacao\\\\oficina-mecanica\" && npx tsc --noEmit 2>&1)",
+      "Bash(tail:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}
