@@ -59,7 +59,7 @@ import {
   exportarParcelasCSV
 } from '../utils/vendas';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = 'http://152.42.165.18:3000';
 
 interface TabPanelProps {
   children?: React.ReactNode;

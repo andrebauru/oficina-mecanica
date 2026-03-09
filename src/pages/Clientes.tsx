@@ -81,7 +81,7 @@ const Clientes = () => {
   const fetchClientes = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:3001/clientes');
+      const response = await axios.get('http://152.42.165.18:3000/clientes');
       setClientes(response.data);
       setClientesFiltrados(response.data);
     } catch (error) {
@@ -131,14 +131,14 @@ const Clientes = () => {
   const handleSubmit = async () => {
     try {
       if (editingId) {
-        await axios.put(`http://localhost:3001/clientes/${editingId}`, formData);
+        await axios.put(`http://152.42.165.18:3000/clientes/${editingId}`, formData);
         setSnackbar({
           open: true,
           message: 'Cliente atualizado com sucesso',
           severity: 'success'
         });
       } else {
-        await axios.post('http://localhost:3001/clientes', formData);
+        await axios.post('http://152.42.165.18:3000/clientes', formData);
         setSnackbar({
           open: true,
           message: 'Cliente adicionado com sucesso',
@@ -169,7 +169,7 @@ const Clientes = () => {
   const handleDelete = async () => {
     if (clienteParaDeletar) {
       try {
-        await axios.delete(`http://localhost:3001/clientes/${clienteParaDeletar}`);
+        await axios.delete(`http://152.42.165.18:3000/clientes/${clienteParaDeletar}`);
         setSnackbar({
           open: true,
           message: 'Cliente excluído com sucesso',

@@ -84,8 +84,8 @@ const Veiculos = () => {
     try {
       setLoading(true);
       const [veiculosRes, clientesRes] = await Promise.all([
-        axios.get('http://localhost:3001/veiculos'),
-        axios.get('http://localhost:3001/clientes')
+        axios.get('http://152.42.165.18:3000/veiculos'),
+        axios.get('http://152.42.165.18:3000/clientes')
       ]);
       setVeiculos(veiculosRes.data);
       setClientes(clientesRes.data);
@@ -141,14 +141,14 @@ const Veiculos = () => {
   const handleSubmit = async () => {
     try {
       if (editingId) {
-        await axios.put(`http://localhost:3001/veiculos/${editingId}`, formData);
+        await axios.put(`http://152.42.165.18:3000/veiculos/${editingId}`, formData);
         setSnackbar({
           open: true,
           message: 'Veículo atualizado com sucesso',
           severity: 'success'
         });
       } else {
-        await axios.post('http://localhost:3001/veiculos', formData);
+        await axios.post('http://152.42.165.18:3000/veiculos', formData);
         setSnackbar({
           open: true,
           message: 'Veículo adicionado com sucesso',
@@ -180,7 +180,7 @@ const Veiculos = () => {
   const handleDelete = async () => {
     if (veiculoParaDeletar) {
       try {
-        await axios.delete(`http://localhost:3001/veiculos/${veiculoParaDeletar}`);
+        await axios.delete(`http://152.42.165.18:3000/veiculos/${veiculoParaDeletar}`);
         setSnackbar({
           open: true,
           message: 'Veículo excluído com sucesso',

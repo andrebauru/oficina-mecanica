@@ -76,8 +76,8 @@ export const ContratoDialog: React.FC<ContratoDialogProps> = ({
     setCarregandoDados(true);
     try {
       const [configRes, ordensRes] = await Promise.all([
-        axios.get('http://localhost:3001/configuracoes').catch(() => ({ data: [] })),
-        axios.get('http://localhost:3001/ordens_servico').catch(() => ({ data: [] })),
+        axios.get('http://152.42.165.18:3000/configuracoes').catch(() => ({ data: [] })),
+        axios.get('http://152.42.165.18:3000/ordens_servico').catch(() => ({ data: [] })),
       ]);
       if (configRes.data.length > 0) setConfig(configRes.data[0]);
 

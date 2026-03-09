@@ -55,7 +55,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
   const { language, setLanguage } = useLanguage();
 
   useEffect(() => {
-    axios.get('http://localhost:3001/configuracoes')
+    axios.get('http://152.42.165.18:3000/configuracoes')
       .then(r => { if (r.data[0]?.nomeEmpresa) setNomeEmpresa(r.data[0].nomeEmpresa); })
       .catch(() => {});
   }, []);

@@ -59,8 +59,8 @@ const Login = ({ onLogin }: LoginProps) => {
 
   useEffect(() => {
     Promise.all([
-      axios.get('http://localhost:3001/usuarios').catch(() => ({ data: [] })),
-      axios.get('http://localhost:3001/configuracoes').catch(() => ({ data: [] })),
+      axios.get('http://152.42.165.18:3000/usuarios').catch(() => ({ data: [] })),
+      axios.get('http://152.42.165.18:3000/configuracoes').catch(() => ({ data: [] })),
     ]).then(([usersRes, configRes]) => {
       const loadedUsers: UsuarioLogin[] = usersRes.data;
       setUsers(loadedUsers);
@@ -83,14 +83,14 @@ const Login = ({ onLogin }: LoginProps) => {
         if (senha !== confirmar) { setErro('Senhas não coincidem'); setSalvando(false); return; }
         if (senha.length < 4) { setErro('Senha deve ter ao menos 4 caracteres'); setSalvando(false); return; }
 
-        await axios.post('http://localhost:3001/usuarios', {
+        await axios.post('http://152.42.165.18:3000/usuarios', {
           nome: usuario.trim(),
           email: '',
           idioma: 'pt',
           senhaHash: hash
         });
         if (config?.id) {
-          await axios.put(`http://localhost:3001/configuracoes/${config.id}`, { ...config });
+          await axios.put(`http://152.42.165.18:3000/configuracoes/${config.id}`, { ...config });
         }
         sessionStorage.setItem('authenticated', 'true');
         onLogin();
@@ -126,7 +126,7 @@ const Login = ({ onLogin }: LoginProps) => {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5' }}>
       <Paper sx={{ p: 4, maxWidth: 400, width: '100%', textAlign: 'center' }} elevation={4}>
-        <img src={HirataLogo} alt="Logo" style={{ height: 80, marginBottom: 16 }} />
+        <img src={HirataLogo} alt="Logo" style={{ height: 140, marginBottom: 24 }} />
         <Typography variant="h5" fontWeight="bold" mb={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
           <LockIcon />
           {primeiroUso ? 'Definir Acesso' : 'Acesso ao Sistema'}

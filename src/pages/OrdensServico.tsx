@@ -162,11 +162,11 @@ const OrdensServico = () => {
     try {
       setLoading(true);
       const [ordensRes, veiculosRes, clientesRes, servicosRes, pecasRes] = await Promise.all([
-        axios.get('http://localhost:3001/ordens_servico'),
-        axios.get('http://localhost:3001/veiculos'),
-        axios.get('http://localhost:3001/clientes'),
-        axios.get('http://localhost:3001/servicos'),
-        axios.get('http://localhost:3001/pecas')
+        axios.get('http://152.42.165.18:3000/ordens_servico'),
+        axios.get('http://152.42.165.18:3000/veiculos'),
+        axios.get('http://152.42.165.18:3000/clientes'),
+        axios.get('http://152.42.165.18:3000/servicos'),
+        axios.get('http://152.42.165.18:3000/pecas')
       ]);
       const ordensData = ordensRes.data;
       setOrdens(ordensData);
@@ -309,7 +309,7 @@ const OrdensServico = () => {
     for (const pecaId of pecasIds) {
       const peca = pecas.find(p => p.id === pecaId);
       if (peca) {
-        await axios.put(`http://localhost:3001/pecas/${pecaId}`, {
+        await axios.put(`http://152.42.165.18:3000/pecas/${pecaId}`, {
           ...peca,
           quantidade: peca.quantidade - 1
         });
@@ -321,7 +321,7 @@ const OrdensServico = () => {
     for (const pecaId of pecasIds) {
       const peca = pecas.find(p => p.id === pecaId);
       if (peca) {
-        await axios.put(`http://localhost:3001/pecas/${pecaId}`, {
+        await axios.put(`http://152.42.165.18:3000/pecas/${pecaId}`, {
           ...peca,
           quantidade: peca.quantidade + 1
         });
@@ -360,7 +360,7 @@ const OrdensServico = () => {
         const novasPecas = formData.pecasIds.filter(p => !ordemAntiga?.pecasIds.includes(p));
         const pecasRemovidas = ordemAntiga?.pecasIds.filter(p => !formData.pecasIds.includes(p)) ?? [];
 
-        await axios.put(`http://localhost:3001/ordens_servico/${editingId}`, ordemData);
+        await axios.put(`http://152.42.165.18:3000/ordens_servico/${editingId}`, ordemData);
         await restaurarEstoque(pecasRemovidas);
         await atualizarEstoque(novasPecas);
 
@@ -370,7 +370,7 @@ const OrdensServico = () => {
           severity: 'success'
         });
       } else {
-        await axios.post('http://localhost:3001/ordens_servico', ordemData);
+        await axios.post('http://152.42.165.18:3000/ordens_servico', ordemData);
         await atualizarEstoque(formData.pecasIds);
 
         setSnackbar({
@@ -408,7 +408,7 @@ const OrdensServico = () => {
         if (ordemADeletar) {
           await restaurarEstoque(ordemADeletar.pecasIds);
         }
-        await axios.delete(`http://localhost:3001/ordens_servico/${ordemParaDeletar}`);
+        await axios.delete(`http://152.42.165.18:3000/ordens_servico/${ordemParaDeletar}`);
         setSnackbar({
           open: true,
           message: 'Ordem de serviço excluída com sucesso',
@@ -443,7 +443,7 @@ const OrdensServico = () => {
     const updated = [...current];
     updated[index] = !updated[index];
     try {
-      await axios.patch(`http://localhost:3001/ordens_servico/${ordem.id}`, { parcelasStatus: updated });
+      await axios.patch(`http://152.42.165.18:3000/ordens_servico/${ordem.id}`, { parcelasStatus: updated });
       fetchData();
     } catch {
       setSnackbar({ open: true, message: 'Erro ao atualizar pagamento', severity: 'error' });

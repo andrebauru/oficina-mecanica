@@ -70,7 +70,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:3001/documentos?entityId=${entityId}&entityType=${entityType}`
+        `http://152.42.165.18:3000/documentos?entityId=${entityId}&entityType=${entityType}`
       );
       const docs: Documento[] = res.data;
       setDocumentos(docs);
@@ -95,7 +95,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
     try {
       for (const file of files) {
         const base64 = await resizeImage(file);
-        await axios.post('http://localhost:3001/documentos', {
+        await axios.post('http://152.42.165.18:3000/documentos', {
           entityId,
           entityType,
           base64,
@@ -117,7 +117,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
   const handleSaveAnotacao = async (doc: Documento) => {
     try {
       const novaAnotacao = anotacoes[doc.id] ?? '';
-      await axios.put(`http://localhost:3001/documentos/${doc.id}`, { ...doc, anotacao: novaAnotacao });
+      await axios.put(`http://152.42.165.18:3000/documentos/${doc.id}`, { ...doc, anotacao: novaAnotacao });
       setDocumentos(prev => prev.map(d => d.id === doc.id ? { ...d, anotacao: novaAnotacao } : d));
       setSnackbar({ open: true, message: 'Anotação salva', severity: 'success' });
     } catch {
@@ -127,7 +127,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
 
   const handleDelete = async (id: string) => {
     try {
-      await axios.delete(`http://localhost:3001/documentos/${id}`);
+      await axios.delete(`http://152.42.165.18:3000/documentos/${id}`);
       setDocumentos(prev => prev.filter(d => d.id !== id));
       setSnackbar({ open: true, message: 'Documento excluído', severity: 'success' });
     } catch {

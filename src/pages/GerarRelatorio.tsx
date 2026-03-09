@@ -81,9 +81,9 @@ const GerarRelatorio = () => {
 
   useEffect(() => {
     Promise.all([
-      axios.get('http://localhost:3001/ordens_servico'),
-      axios.get('http://localhost:3001/vendas_carros'),
-      axios.get('http://localhost:3001/configuracoes').catch(() => ({ data: [] })),
+      axios.get('http://152.42.165.18:3000/ordens_servico'),
+      axios.get('http://152.42.165.18:3000/vendas_carros'),
+      axios.get('http://152.42.165.18:3000/configuracoes').catch(() => ({ data: [] })),
     ]).then(([ordensRes, vendasRes, configRes]) => {
       setOrdensServico(ordensRes.data);
       setVendasCarros(vendasRes.data);
