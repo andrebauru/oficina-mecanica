@@ -242,7 +242,10 @@
       "fabricante": "Honda",
       "modelo": "Civic",
       "ano": 2020,
-      "kilometragem": 40000
+      "kilometragem": 40000,
+      "parcelasStatus": [
+        true
+      ]
     }
   ],
   "configuracoes": [
@@ -528,16 +531,18 @@
   "documentos": [],
   "usuarios": [
     {
-      "id": "1",
       "nome": "Admin",
       "email": "admin@oficina.com",
-      "idioma": "pt"
+      "idioma": "pt",
+      "senhaHash": "0fae2419705676",
+      "id": "1"
     },
     {
-      "id": "f853",
       "nome": "user",
       "email": "andretsc@gmail.com",
-      "idioma": "fil"
+      "idioma": "fil",
+      "senhaHash": "0fae2419705676",
+      "id": "f853"
     }
   ],
   "vendas": [
@@ -552,7 +557,7 @@
       "juros": 14.6,
       "statusVenda": "ativo",
       "foroPagamento": "Tsu",
-      "nomeContrato": "contrato_v001_JoaoSilva.pdf",
+      "nomeContrato": "contrato_vi_v001_joo_silva_2026-03-07.pdf",
       "placa": "DEF-5678",
       "chassi": "12345ABC67890DEF"
     },
@@ -567,9 +572,23 @@
       "juros": 0,
       "statusVenda": "quitado",
       "foroPagamento": "Tsu",
-      "nomeContrato": "contrato_v002_MariaOliveira.pdf",
+      "nomeContrato": "contrato_ja_v002_maria_oliveira_2026-03-06.pdf",
       "placa": "GHI-9012",
       "chassi": "98765XYZ54321GHI"
+    },
+    {
+      "id": "v1772756331922",
+      "clienteId": "1",
+      "veiculoId": "2",
+      "dataVenda": "2026-03-06T00:18:51.922Z",
+      "valorTotal": 1000000,
+      "tipoVenda": "vista",
+      "numeroParcelas": 1,
+      "juros": 14.6,
+      "statusVenda": "quitado",
+      "foroPagamento": "Tsu",
+      "placa": "DEF-5678",
+      "chassi": ""
     }
   ],
   "parcelas": [
@@ -715,6 +734,17 @@
       "dataPagamento": "2026-01-20",
       "clienteNome": "Maria Oliveira",
       "clienteTelefone": "(11) 91234-5678"
+    },
+    {
+      "id": "pv1772756331922-01",
+      "vendaId": "v1772756331922",
+      "numeroParcela": 1,
+      "valor": 1000000,
+      "dataVencimento": "2026-03-06",
+      "status": "pago",
+      "dataPagamento": "2026-03-06",
+      "clienteNome": "João Silva",
+      "clienteTelefone": "(11) 98765-4321"
     }
   ]
 }

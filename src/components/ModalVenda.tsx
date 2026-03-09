@@ -20,11 +20,14 @@ import {
   MenuItem,
   Card,
   CardContent,
-  Stack
+  Stack,
+  Checkbox,
+  ListItemText
 } from '@mui/material';
 import { Plus } from 'lucide-react';
 import axios from 'axios';
 import { Cliente, Veiculo, Venda, Parcela } from '../types/vendas';
+import Paper from '@mui/material/Paper';
 import {
   calcularParcelamento,
   calcularVendaVista,
@@ -40,6 +43,21 @@ interface ModalVendaProps {
   onVendaCriada?: () => void;
 }
 
+interface Servico {
+  id: string;
+  nome: string;
+  valor: number;
+  descricao?: string;
+}
+
+interface Peca {
+  id: string;
+  nome: string;
+  preco: number;
+  codigo?: string;
+  quantidade?: number;
+}
+
 interface DadosVenda {
   clienteId: string;
   veiculoId: string;
@@ -47,6 +65,9 @@ interface DadosVenda {
   numeroParcelas: number;
   valorTotal: number;
   juros: number;
+  servicosIds: string[];
+  pecasIds: string[];
+  observacoes?: string;
 }
 
 const ModalVenda: React.FC<ModalVendaProps> = ({ 
@@ -57,9 +78,13 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
   // Estados
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [servicos, setServicos] = useState<Servico[]>([]);
+  const [pecas, setPecas] = useState<Peca[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [dadosCliente, setDadosCliente] = useState<any>(null);
 
   // Dados do formulário
   const [dadosVenda, setDadosVenda] = useState<DadosVenda>({
@@ -68,7 +93,10 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
     tipoVenda: 'parcelado',
     numeroParcelas: 12,
     valorTotal: 1000000,
-    juros: 14.6
+    juros: 14.6,
+    servicosIds: [],
+    pecasIds: [],
+    observacoes: ''
   });
 
   // Preview
@@ -84,13 +112,17 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
       setCarregando(true);
       setErro(null);
 
-      const [clientesRes, veiculosRes] = await Promise.all([
+      const [clientesRes, veiculosRes, servicosRes, pecasRes] = await Promise.all([
         axios.get(`${API_URL}/clientes`),
-        axios.get(`${API_URL}/veiculos`)
+        axios.get(`${API_URL}/veiculos`),
+        axios.get(`${API_URL}/servicos`),
+        axios.get(`${API_URL}/pecas`)
       ]);
 
       setClientes(clientesRes.data);
       setVeiculos(veiculosRes.data);
+      setServicos(servicosRes.data);
+      setPecas(pecasRes.data);
     } catch (err) {
       const mensagem = err instanceof Error ? err.message : 'Erro ao carregar dados';
       setErro(mensagem);
@@ -114,6 +146,16 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
       setPreviewParcelas(resultado.parcelas);
     }
   }, [dadosVenda]);
+
+  // Atualizar dados do cliente quando clienteId muda
+  useEffect(() => {
+    if (dadosVenda.clienteId) {
+      const cliente = clientes.find(c => c.id === dadosVenda.clienteId);
+      setDadosCliente(cliente || null);
+    } else {
+      setDadosCliente(null);
+    }
+  }, [dadosVenda.clienteId, clientes]);
 
   // Validar formulário
   const validar = (): boolean => {
@@ -156,27 +198,39 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
       // Gerar ID da venda
       const vendaId = `v${Date.now()}`;
 
+      // Calcular valor total incluindo serviços e peças selecionados
+      const valorServicos = dadosVenda.servicosIds.reduce((sum, id) => {
+        const s = servicos.find(sv => sv.id === id);
+        return sum + (s?.valor || 0);
+      }, 0);
+      const valorPecas = dadosVenda.pecasIds.reduce((sum, id) => {
+        const p = pecas.find(pc => pc.id === id);
+        return sum + (p?.preco || 0);
+      }, 0);
+      const valorTotalComItens = dadosVenda.valorTotal + valorServicos + valorPecas;
+
       // Criar venda
       const novaVenda: Venda = {
         id: vendaId,
         clienteId: dadosVenda.clienteId,
         veiculoId: dadosVenda.veiculoId,
         dataVenda: new Date().toISOString(),
-        valorTotal: dadosVenda.valorTotal,
+        valorTotal: valorTotalComItens,
         tipoVenda: dadosVenda.tipoVenda,
         numeroParcelas: dadosVenda.numeroParcelas,
         juros: dadosVenda.juros,
         statusVenda: dadosVenda.tipoVenda === 'vista' ? 'quitado' : 'ativo',
         foroPagamento: 'Tsu',
         placa: veiculo.placa,
-        chassi: veiculo.chassi || ''
+        chassi: veiculo.chassi || '',
+        observacoes: dadosVenda.observacoes || ''
       };
 
       // Calcular parcelas
       const resultadoCalc = dadosVenda.tipoVenda === 'vista'
-        ? calcularVendaVista(dadosVenda.valorTotal)
+        ? calcularVendaVista(valorTotalComItens)
         : calcularParcelamento(
-            dadosVenda.valorTotal,
+            valorTotalComItens,
             dadosVenda.numeroParcelas,
             dadosVenda.juros,
             new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -294,6 +348,39 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
               </Grid>
             </Box>
 
+            {/* Dados do cliente selecionado */}
+            {dadosCliente && (
+              <Paper sx={{ p: 2, bgcolor: '#e8f5e9', border: '1px solid #a5d6a7', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#2e7d32' }}>
+                  👤 Dados do Cliente Selecionado
+                </Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" color="text.secondary">Nome</Typography>
+                    <Typography variant="body2" fontWeight={500}>{dadosCliente.nome}</Typography>
+                  </Grid>
+                  {dadosCliente.telefone && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Telefone</Typography>
+                      <Typography variant="body2">{dadosCliente.telefone}</Typography>
+                    </Grid>
+                  )}
+                  {dadosCliente.email && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="caption" color="text.secondary">Email</Typography>
+                      <Typography variant="body2">{dadosCliente.email}</Typography>
+                    </Grid>
+                  )}
+                  {dadosCliente.endereco && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">Endereço</Typography>
+                      <Typography variant="body2">{dadosCliente.endereco}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </Paper>
+            )}
+
             {/* Seção 2: Tipo de Venda */}
             <Box>
               <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
@@ -390,6 +477,71 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
                 )}
               </Grid>
             </Box>
+
+            {/* Seção: Serviços e Peças */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                🔧 Serviços e Peças (Opcional)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Serviços</InputLabel>
+                    <Select
+                      multiple
+                      value={dadosVenda.servicosIds}
+                      label="Serviços"
+                      onChange={(e) => setDadosVenda({ ...dadosVenda, servicosIds: e.target.value as string[] })}
+                      disabled={criando}
+                      renderValue={(selected) => 
+                        (selected as string[]).map(id => servicos.find(s => s.id === id)?.nome).filter(Boolean).join(', ')
+                      }
+                    >
+                      {servicos.map(s => (
+                        <MenuItem key={s.id} value={s.id}>
+                          <Checkbox checked={dadosVenda.servicosIds.includes(s.id)} size="small" />
+                          <ListItemText primary={s.nome} secondary={formatarMoeda(s.valor)} />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Peças</InputLabel>
+                    <Select
+                      multiple
+                      value={dadosVenda.pecasIds}
+                      label="Peças"
+                      onChange={(e) => setDadosVenda({ ...dadosVenda, pecasIds: e.target.value as string[] })}
+                      disabled={criando}
+                      renderValue={(selected) => 
+                        (selected as string[]).map(id => pecas.find(p => p.id === id)?.nome).filter(Boolean).join(', ')
+                      }
+                    >
+                      {pecas.filter(p => (p.quantidade ?? 1) > 0).map(p => (
+                        <MenuItem key={p.id} value={p.id}>
+                          <Checkbox checked={dadosVenda.pecasIds.includes(p.id)} size="small" />
+                          <ListItemText primary={p.nome} secondary={formatarMoeda(p.preco)} />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Box>
+
+            {/* Seção: Observações */}
+            <TextField
+              label="📝 Observações (opcional)"
+              multiline
+              rows={2}
+              fullWidth
+              value={dadosVenda.observacoes || ''}
+              onChange={(e) => setDadosVenda({ ...dadosVenda, observacoes: e.target.value })}
+              placeholder="Termos adicionais, condições especiais..."
+              disabled={criando}
+            />
 
             {/* Seção 4: Preview */}
             <Card sx={{ bgcolor: '#f5f5f5', border: '1px solid #e0e0e0' }}>

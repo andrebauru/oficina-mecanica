@@ -23,7 +23,11 @@ import {
   InputAdornment,
   TableSortLabel,
   Grid,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -43,6 +47,8 @@ interface VendaCarro {
   juros: number;
   valorTotal: number;
   parcelasStatus?: boolean[];
+  clienteId?: string;
+  clienteNome?: string;
 }
 
 interface VendaCarroFormData {
@@ -53,6 +59,8 @@ interface VendaCarroFormData {
   kilometragem: number | '';
   parcelas: number | '';
   juros: number | '';
+  clienteId: string;
+  clienteNome: string;
 }
 
 const vendaCarroVazio: VendaCarroFormData = {
@@ -62,7 +70,9 @@ const vendaCarroVazio: VendaCarroFormData = {
   ano: '',
   kilometragem: '',
   parcelas: 1,
-  juros: 0
+  juros: 0,
+  clienteId: '',
+  clienteNome: '',
 };
 
 const VendasCarros = () => {
@@ -91,6 +101,8 @@ const VendasCarros = () => {
     campo: '',
     direcao: 'asc'
   });
+  const [clientes, setClientes] = useState<Array<{id: string; nome: string; telefone?: string; endereco?: string}>>([]);
+  const [clienteSelecionado, setClienteSelecionado] = useState<{id: string; nome: string; telefone?: string; endereco?: string} | null>(null);
 
   // Cálculo automático de valorTotal e valorParcela
   const valorBase = Number(formData.valor) || 0;
@@ -118,6 +130,9 @@ const VendasCarros = () => {
 
   useEffect(() => {
     fetchVendasCarros();
+    axios.get('http://localhost:3001/clientes')
+      .then(res => setClientes(res.data))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -128,6 +143,15 @@ const VendasCarros = () => {
     }
   }, [loading, highlightId]);
 
+  useEffect(() => {
+    if (formData.clienteId) {
+      const c = clientes.find(cl => cl.id === formData.clienteId);
+      setClienteSelecionado(c || null);
+    } else {
+      setClienteSelecionado(null);
+    }
+  }, [formData.clienteId, clientes]);
+
   const handleOpenForm = (vendaCarro?: VendaCarro) => {
     if (vendaCarro) {
       setFormData({
@@ -137,13 +161,16 @@ const VendasCarros = () => {
         ano: vendaCarro.ano,
         kilometragem: vendaCarro.kilometragem,
         parcelas: vendaCarro.parcelas ?? 1,
-        juros: vendaCarro.juros ?? 0
+        juros: vendaCarro.juros ?? 0,
+        clienteId: vendaCarro.clienteId || '',
+        clienteNome: vendaCarro.clienteNome || '',
       });
       setEditingId(vendaCarro.id);
     } else {
       setFormData(vendaCarroVazio);
       setEditingId(null);
     }
+    setClienteSelecionado(null);
     setOpenForm(true);
   };
 
@@ -175,7 +202,9 @@ const VendasCarros = () => {
         parcelas: newParcelas,
         juros: Number(formData.juros) || 0,
         valorTotal,
-        parcelasStatus
+        parcelasStatus,
+        clienteId: formData.clienteId || undefined,
+        clienteNome: formData.clienteNome || undefined,
       };
 
       if (editingId) {
@@ -481,6 +510,38 @@ const VendasCarros = () => {
         <DialogTitle>{editingId ? 'Editar Venda de Carro' : 'Nova Venda de Carro'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Cliente (Comprador)</InputLabel>
+                <Select
+                  value={formData.clienteId}
+                  label="Cliente (Comprador)"
+                  onChange={e => {
+                    const clienteId = e.target.value;
+                    const cliente = clientes.find(c => c.id === clienteId);
+                    setFormData(prev => ({
+                      ...prev,
+                      clienteId,
+                      clienteNome: cliente?.nome || ''
+                    }));
+                  }}
+                >
+                  <MenuItem value=""><em>Nenhum</em></MenuItem>
+                  {clientes.map(c => (
+                    <MenuItem key={c.id} value={c.id}>{c.nome}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            {clienteSelecionado && (
+              <Grid item xs={12}>
+                <Paper sx={{ p: 1.5, bgcolor: '#e8f5e9', border: '1px solid #a5d6a7' }}>
+                  <Typography variant="caption" color="text.secondary">Dados do Cliente</Typography>
+                  <Typography variant="body2" fontWeight={500}>{clienteSelecionado.nome}</Typography>
+                  {clienteSelecionado.telefone && <Typography variant="caption">{clienteSelecionado.telefone}</Typography>}
+                </Paper>
+              </Grid>
+            )}
             <Grid item xs={12} sm={6}>
               <TextField
                 autoFocus

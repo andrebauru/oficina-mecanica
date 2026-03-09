@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   IconButton, Tooltip, Divider, Typography, AppBar, Toolbar, useMediaQuery, useTheme,
   Select, MenuItem
 } from '@mui/material';
+import axios from 'axios';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -47,10 +48,17 @@ interface NavbarProps {
 
 const Navbar = ({ expanded, onToggle }: NavbarProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [nomeEmpresa, setNomeEmpresa] = useState('');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const location = useLocation();
   const { language, setLanguage } = useLanguage();
+
+  useEffect(() => {
+    axios.get('http://localhost:3001/configuracoes')
+      .then(r => { if (r.data[0]?.nomeEmpresa) setNomeEmpresa(r.data[0].nomeEmpresa); })
+      .catch(() => {});
+  }, []);
 
   const drawerContent = (
     <Box sx={{
@@ -74,7 +82,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
             src={HirataLogo}
             alt="Logo"
             style={{
-              height: expanded ? 58 : 38,
+              height: expanded ? 90 : 48,
               transition: 'height 0.25s ease',
               filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))',
             }}
@@ -152,44 +160,62 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
         })}
       </List>
 
-      {/* Bottom: version / collapsed toggle on mobile */}
-      {expanded && (
-        <Box sx={{ p: 1.5, borderTop: '1px solid rgba(255,214,0,0.15)' }}>
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: 'rgba(255,214,0,0.6)', display: 'block', mb: 0.5 }}>
-              Idioma
+      {/* Rodapé */}
+      <Box sx={{ borderTop: '1px solid rgba(255,214,0,0.15)', p: expanded ? 1.5 : 0.75 }}>
+        {expanded && (
+          <>
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="caption" sx={{ color: 'rgba(255,214,0,0.6)', display: 'block', mb: 0.5 }}>
+                Idioma
+              </Typography>
+              <Select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as 'pt' | 'fil')}
+                size="small"
+                sx={{
+                  width: '100%',
+                  color: '#FFD600',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,214,0,0.2)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,214,0,0.4)' },
+                  '& .MuiSvgIcon-root': { color: '#FFD600' },
+                  '& .MuiOutlinedInput-input': { padding: '8px 12px', fontSize: '0.875rem' }
+                }}
+              >
+                <MenuItem value="pt">Português</MenuItem>
+                <MenuItem value="fil">Filipino</MenuItem>
+              </Select>
+            </Box>
+            <Divider sx={{ borderColor: 'rgba(255,214,0,0.1)', mb: 1 }} />
+            {nomeEmpresa && (
+              <Typography sx={{ color: '#FFD600', fontSize: 11, fontWeight: 700, textAlign: 'center', mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {nomeEmpresa}
+              </Typography>
+            )}
+            <Typography sx={{ color: 'rgba(255,214,0,0.5)', fontSize: 10, textAlign: 'center', mb: 0.5 }}>
+              v1.5
             </Typography>
-            <Select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as 'pt' | 'fil')}
-              size="small"
-              sx={{
-                width: '100%',
-                color: '#FFD600',
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'rgba(255,214,0,0.2)'
-                },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'rgba(255,214,0,0.4)'
-                },
-                '& .MuiSvgIcon-root': {
-                  color: '#FFD600'
-                },
-                '& .MuiOutlinedInput-input': {
-                  padding: '8px 12px',
-                  fontSize: '0.875rem'
-                }
-              }}
-            >
-              <MenuItem value="pt">Português</MenuItem>
-              <MenuItem value="fil">Filipino</MenuItem>
-            </Select>
-          </Box>
-          <Typography sx={{ color: 'rgba(255,214,0,0.4)', fontSize: 10, textAlign: 'center' }}>
-            v1.0 · Gestão Oficina
-          </Typography>
-        </Box>
-      )}
+            <Typography sx={{ fontSize: 10, textAlign: 'center' }}>
+              <a
+                href="https://andretsc.info"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'rgba(255,214,0,0.55)', textDecoration: 'none' }}
+                onMouseOver={e => (e.currentTarget.style.color = '#FFD600')}
+                onMouseOut={e => (e.currentTarget.style.color = 'rgba(255,214,0,0.55)')}
+              >
+                © Andretsc
+              </a>
+            </Typography>
+          </>
+        )}
+        {!expanded && (
+          <Tooltip title={`${nomeEmpresa || 'Oficina'} · v1.5 · andretsc.info`} placement="right" arrow>
+            <Typography sx={{ color: 'rgba(255,214,0,0.4)', fontSize: 9, textAlign: 'center', cursor: 'default' }}>
+              v1.5
+            </Typography>
+          </Tooltip>
+        )}
+      </Box>
     </Box>
   );
 

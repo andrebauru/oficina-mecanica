@@ -46,6 +46,7 @@ export interface Venda {
   chassi: string;
   dataQuitar?: string; // data de quitação (apenas para 'quitado')
   reciboPDF?: string; // nome do arquivo de recibo
+  observacoes?: string;
 }
 
 // ========== PARCELAS ==========
@@ -140,4 +141,24 @@ export interface DadosParcelaSingular {
   clienteNome: string;
   clienteTelefone: string;
   vendaId: string;
+}
+
+// ========== CONTRATO COMPLETO ==========
+
+export interface ServicoContrato {
+  id: string;
+  descricao: string;
+  valor: number;
+  data?: string;
+}
+
+export interface DadosContratoCompleto extends DadosContrato {
+  logoUrl?: string;
+  vendedor?: string;
+  nomeEmpresa?: string;
+  enderecoEmpresa?: string;
+  telefoneEmpresa?: string;
+  numeroAutorizacao?: string;
+  servicosRealizados?: ServicoContrato[];
+  observacoes?: string;
 }

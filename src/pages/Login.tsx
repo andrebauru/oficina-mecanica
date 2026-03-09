@@ -21,6 +21,14 @@ interface Configuracao {
   numeroAutorizacao?: string;
 }
 
+interface UsuarioLogin {
+  id: string;
+  nome: string;
+  email: string;
+  idioma: string;
+  senhaHash?: string;
+}
+
 interface LoginProps {
   onLogin: () => void;
 }
@@ -39,8 +47,10 @@ function hashPassword(str: string): string {
 }
 
 const Login = ({ onLogin }: LoginProps) => {
+  const [users, setUsers] = useState<UsuarioLogin[]>([]);
   const [config, setConfig] = useState<Configuracao | null>(null);
   const [loading, setLoading] = useState(true);
+  const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmar, setConfirmar] = useState('');
   const [erro, setErro] = useState('');
@@ -48,18 +58,16 @@ const Login = ({ onLogin }: LoginProps) => {
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    axios.get('http://localhost:3001/configuracoes')
-      .then(res => {
-        const items: Configuracao[] = res.data;
-        if (items.length === 0 || !items[0].senhaHash) {
-          setPrimeiroUso(true);
-          setConfig(items[0] ?? null);
-        } else {
-          setConfig(items[0]);
-        }
-      })
-      .catch(() => setPrimeiroUso(true))
-      .finally(() => setLoading(false));
+    Promise.all([
+      axios.get('http://localhost:3001/usuarios').catch(() => ({ data: [] })),
+      axios.get('http://localhost:3001/configuracoes').catch(() => ({ data: [] })),
+    ]).then(([usersRes, configRes]) => {
+      const loadedUsers: UsuarioLogin[] = usersRes.data;
+      setUsers(loadedUsers);
+      const configItems: Configuracao[] = configRes.data;
+      if (configItems.length > 0) setConfig(configItems[0]);
+      if (loadedUsers.length === 0) setPrimeiroUso(true);
+    }).finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = async () => {
@@ -71,22 +79,29 @@ const Login = ({ onLogin }: LoginProps) => {
       const hash = hashPassword(senha);
 
       if (primeiroUso) {
-        if (senha !== confirmar) { setErro('Senhas não coincidem'); return; }
-        if (senha.length < 4) { setErro('Senha deve ter ao menos 4 caracteres'); return; }
+        if (!usuario.trim()) { setErro('Digite o nome'); setSalvando(false); return; }
+        if (senha !== confirmar) { setErro('Senhas não coincidem'); setSalvando(false); return; }
+        if (senha.length < 4) { setErro('Senha deve ter ao menos 4 caracteres'); setSalvando(false); return; }
 
+        await axios.post('http://localhost:3001/usuarios', {
+          nome: usuario.trim(),
+          email: '',
+          idioma: 'pt',
+          senhaHash: hash
+        });
         if (config?.id) {
-          await axios.put(`http://localhost:3001/configuracoes/${config.id}`, { ...config, senhaHash: hash });
-        } else {
-          await axios.post('http://localhost:3001/configuracoes', { senhaHash: hash });
+          await axios.put(`http://localhost:3001/configuracoes/${config.id}`, { ...config });
         }
         sessionStorage.setItem('authenticated', 'true');
         onLogin();
       } else {
-        if (hash === config?.senhaHash) { // compare hashes
+        if (!usuario.trim()) { setErro('Digite o nome de usuário'); setSalvando(false); return; }
+        const found = users.find(u => u.nome === usuario.trim() && u.senhaHash === hash);
+        if (found) {
           sessionStorage.setItem('authenticated', 'true');
           onLogin();
         } else {
-          setErro('Senha incorreta');
+          setErro('Usuário ou senha incorretos');
         }
       }
     } catch {
@@ -114,14 +129,24 @@ const Login = ({ onLogin }: LoginProps) => {
         <img src={HirataLogo} alt="Logo" style={{ height: 80, marginBottom: 16 }} />
         <Typography variant="h5" fontWeight="bold" mb={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
           <LockIcon />
-          {primeiroUso ? 'Definir Senha de Acesso' : 'Acesso ao Sistema'}
+          {primeiroUso ? 'Definir Acesso' : 'Acesso ao Sistema'}
         </Typography>
         {primeiroUso && (
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Primeiro acesso — defina uma senha para proteger o sistema.
+            Primeiro acesso — crie o primeiro usuário para proteger o sistema.
           </Typography>
         )}
         {erro && <Alert severity="error" sx={{ mb: 2, textAlign: 'left' }}>{erro}</Alert>}
+        <TextField
+          fullWidth
+          label={primeiroUso ? "Nome" : "Usuário"}
+          type="text"
+          value={usuario}
+          onChange={e => setUsuario(e.target.value)}
+          onKeyDown={handleKeyDown}
+          sx={{ mb: 2 }}
+          autoFocus
+        />
         <TextField
           fullWidth
           label="Senha"
@@ -130,7 +155,6 @@ const Login = ({ onLogin }: LoginProps) => {
           onChange={e => setSenha(e.target.value)}
           onKeyDown={handleKeyDown}
           sx={{ mb: 2 }}
-          autoFocus
         />
         {primeiroUso && (
           <TextField
@@ -151,7 +175,7 @@ const Login = ({ onLogin }: LoginProps) => {
           disabled={salvando}
           startIcon={salvando ? <CircularProgress size={18} color="inherit" /> : <LockIcon />}
         >
-          {primeiroUso ? 'Definir Senha' : 'Entrar'}
+          {primeiroUso ? 'Criar Acesso' : 'Entrar'}
         </Button>
       </Paper>
     </Box>

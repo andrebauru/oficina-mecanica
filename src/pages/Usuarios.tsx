@@ -37,12 +37,27 @@ interface Usuario {
   nome: string;
   email: string;
   idioma: Language;
+  senhaHash?: string;
 }
 
 interface FormData {
   nome: string;
   email: string;
   idioma: Language;
+  senha: string;
+  confirmarSenha: string;
+}
+
+function hashPassword(str: string): string {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
 }
 
 const Usuarios = () => {
@@ -54,7 +69,9 @@ const Usuarios = () => {
   const [formData, setFormData] = useState<FormData>({
     nome: '',
     email: '',
-    idioma: 'pt'
+    idioma: 'pt',
+    senha: '',
+    confirmarSenha: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [snackbar, setSnackbar] = useState({
@@ -88,15 +105,31 @@ const Usuarios = () => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.nome.trim()) {
       newErrors.nome = 'Nome é obrigatório';
     }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email é obrigatório';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Email inválido';
+    }
+
+    if (!editingId) {
+      if (!formData.senha) {
+        newErrors.senha = 'Senha é obrigatória';
+      } else if (formData.senha.length < 4) {
+        newErrors.senha = 'Senha deve ter ao menos 4 caracteres';
+      } else if (formData.senha !== formData.confirmarSenha) {
+        newErrors.confirmarSenha = 'Senhas não coincidem';
+      }
+    } else if (formData.senha) {
+      if (formData.senha.length < 4) {
+        newErrors.senha = 'Senha deve ter ao menos 4 caracteres';
+      } else if (formData.senha !== formData.confirmarSenha) {
+        newErrors.confirmarSenha = 'Senhas não coincidem';
+      }
     }
 
     setErrors(newErrors);
@@ -109,14 +142,18 @@ const Usuarios = () => {
       setFormData({
         nome: usuario.nome,
         email: usuario.email,
-        idioma: usuario.idioma
+        idioma: usuario.idioma,
+        senha: '',
+        confirmarSenha: ''
       });
     } else {
       setEditingId(null);
       setFormData({
         nome: '',
         email: '',
-        idioma: language || 'pt'
+        idioma: language || 'pt',
+        senha: '',
+        confirmarSenha: ''
       });
     }
     setErrors({});
@@ -129,7 +166,9 @@ const Usuarios = () => {
     setFormData({
       nome: '',
       email: '',
-      idioma: 'pt'
+      idioma: 'pt',
+      senha: '',
+      confirmarSenha: ''
     });
     setErrors({});
   };
@@ -139,11 +178,17 @@ const Usuarios = () => {
 
     setSaving(true);
     try {
+      const { senha, confirmarSenha, ...baseData } = formData;
+      const payload: Record<string, unknown> = { ...baseData };
+      if (senha) {
+        payload.senhaHash = hashPassword(senha);
+      }
+
       if (editingId) {
         // Atualizar
         await axios.put(
           `http://localhost:3001/usuarios/${editingId}`,
-          formData
+          payload
         );
         setSnackbar({
           open: true,
@@ -152,7 +197,7 @@ const Usuarios = () => {
         });
       } else {
         // Criar
-        await axios.post('http://localhost:3001/usuarios', formData);
+        await axios.post('http://localhost:3001/usuarios', payload);
         setSnackbar({
           open: true,
           message: t('usuarioCriado'),
@@ -196,7 +241,9 @@ const Usuarios = () => {
   };
 
   const getIdiomaLabel = (idioma: Language) => {
-    return idioma === 'pt' ? t('portugues') : t('filipino');
+    if (idioma === 'pt') return t('portugues');
+    if (idioma === 'vi') return t('vietnamita');
+    return t('filipino');
   };
 
   if (loading) {
@@ -229,6 +276,7 @@ const Usuarios = () => {
               <TableCell sx={{ fontWeight: 'bold' }}>{t('nome')}</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>{t('email')}</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>{t('idioma')}</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>{t('senha')}</TableCell>
               <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>
                 {t('acao')}
               </TableCell>
@@ -237,7 +285,7 @@ const Usuarios = () => {
           <TableBody>
             {usuarios.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} sx={{ textAlign: 'center', py: 3 }}>
+                <TableCell colSpan={5} sx={{ textAlign: 'center', py: 3 }}>
                   <Typography color="text.secondary">
                     Nenhum usuário cadastrado
                   </Typography>
@@ -249,6 +297,7 @@ const Usuarios = () => {
                   <TableCell>{usuario.nome}</TableCell>
                   <TableCell>{usuario.email}</TableCell>
                   <TableCell>{getIdiomaLabel(usuario.idioma)}</TableCell>
+                  <TableCell>{usuario.senhaHash ? '••••••' : '—'}</TableCell>
                   <TableCell sx={{ textAlign: 'center' }}>
                     <IconButton
                       size="small"
@@ -314,6 +363,30 @@ const Usuarios = () => {
               />
             </Grid>
             <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label={t('senha')}
+                type="password"
+                value={formData.senha}
+                onChange={e => setFormData(p => ({ ...p, senha: e.target.value }))}
+                error={!!errors.senha}
+                helperText={errors.senha || (!editingId ? '' : 'Deixe em branco para manter a senha atual')}
+                disabled={saving}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label={t('confirmarSenha')}
+                type="password"
+                value={formData.confirmarSenha}
+                onChange={e => setFormData(p => ({ ...p, confirmarSenha: e.target.value }))}
+                error={!!errors.confirmarSenha}
+                helperText={errors.confirmarSenha}
+                disabled={saving}
+              />
+            </Grid>
+            <Grid item xs={12}>
               <FormControl fullWidth>
                 <InputLabel>{t('idioma')}</InputLabel>
                 <Select
@@ -324,6 +397,7 @@ const Usuarios = () => {
                 >
                   <MenuItem value="pt">{t('portugues')}</MenuItem>
                   <MenuItem value="fil">{t('filipino')}</MenuItem>
+                  <MenuItem value="vi">{t('vietnamita')}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

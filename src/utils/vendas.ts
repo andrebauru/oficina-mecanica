@@ -169,9 +169,11 @@ export function atualizarStatusParcela(parcela: Parcela): StatusParcela {
  * @returns String formatada como moeda
  */
 export function formatarMoeda(valor: number): string {
-  return new Intl.NumberFormat('pt-BR', {
+  return new Intl.NumberFormat('ja-JP', {
     style: 'currency',
-    currency: 'BRL'
+    currency: 'JPY',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(valor);
 }
 

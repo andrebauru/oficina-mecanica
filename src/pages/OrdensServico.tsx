@@ -156,6 +156,7 @@ const OrdensServico = () => {
     message: '',
     severity: 'success' as 'success' | 'error' | 'info' | 'warning'
   });
+  const [clienteIdFiltro, setClienteIdFiltro] = useState('');
 
   const fetchData = async () => {
     try {
@@ -200,6 +201,8 @@ const OrdensServico = () => {
 
   const handleOpenForm = (ordem?: OrdemServico) => {
     if (ordem) {
+      const veiculoOrdem = veiculos.find(v => v.id === ordem.veiculoId);
+      setClienteIdFiltro(veiculoOrdem?.clienteId || '');
       setFormData({
         veiculoId: ordem.veiculoId,
         dataEntrada: dayjs(ordem.dataEntrada),
@@ -224,6 +227,7 @@ const OrdensServico = () => {
   const handleCloseForm = () => {
     setOpenForm(false);
     setFormData(ordemVazia);
+    setClienteIdFiltro('');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -327,6 +331,10 @@ const OrdensServico = () => {
 
   const handleSubmit = async () => {
     try {
+      if (!formData.veiculoId) {
+        setSnackbar({ open: true, message: 'Selecione um veículo', severity: 'error' });
+        return;
+      }
       // Verificar estoque disponível
       if (!verificarEstoque(formData.pecasIds)) {
         return;
@@ -1047,6 +1055,25 @@ const OrdensServico = () => {
         <DialogTitle>{editingId ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            {/* Selecionar Cliente */}
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Cliente</InputLabel>
+                <Select
+                  value={clienteIdFiltro}
+                  label="Cliente"
+                  onChange={(e) => {
+                    setClienteIdFiltro(e.target.value);
+                    setFormData(prev => ({ ...prev, veiculoId: '' }));
+                  }}
+                >
+                  <MenuItem value=""><em>Selecione um cliente</em></MenuItem>
+                  {clientes.map(c => (
+                    <MenuItem key={c.id} value={c.id}>{c.nome}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth margin="dense">
                 <InputLabel id="veiculo-label">Veículo</InputLabel>
@@ -1057,11 +1084,13 @@ const OrdensServico = () => {
                   onChange={handleSelectChange}
                   label="Veículo"
                 >
-                  {veiculos.map((veiculo) => (
-                    <MenuItem key={veiculo.id} value={veiculo.id}>
-                      {veiculo.marca} {veiculo.modelo} - {veiculo.placa} ({getClienteInfo(veiculo.id)})
-                    </MenuItem>
-                  ))}
+                  {veiculos
+                    .filter(v => !clienteIdFiltro || v.clienteId === clienteIdFiltro)
+                    .map((veiculo) => (
+                      <MenuItem key={veiculo.id} value={veiculo.id}>
+                        {veiculo.marca} {veiculo.modelo} ({veiculo.placa})
+                      </MenuItem>
+                    ))}
                 </Select>
               </FormControl>
             </Grid>

@@ -64,6 +64,8 @@ const translations = {
     // Idiomas
     portugues: 'Português',
     filipino: 'Filipino',
+    vietnamita: 'Vietnamita',
+    senha: 'Senha',
   },
   fil: {
     // Menu
@@ -129,10 +131,79 @@ const translations = {
     // Idiomas
     portugues: 'Português',
     filipino: 'Filipino',
+    vietnamita: 'Vietnamese',
+    senha: 'Password',
+  },
+  vi: {
+    // Menu
+    dashboard: 'Bảng điều khiển',
+    os: 'ĐH',
+    clientes: 'Khách hàng',
+    veiculos: 'Xe cộ',
+    servicos: 'Dịch vụ',
+    pecas: 'Phụ tùng',
+    vendasCarros: 'Bán xe',
+    financeiro: 'Tài chính',
+    relatorios: 'Báo cáo',
+    gerarRelatorio: 'Tạo báo cáo PDF',
+    configuracoes: 'Cài đặt',
+    usuarios: 'Người dùng',
+
+    // Dashboard
+    totalClientes: 'Tổng số khách hàng',
+    totalVeiculos: 'Tổng số xe',
+    ordensEmAndamento: 'Đơn hàng đang xử lý',
+    faturamentoTotal: 'Doanh thu tổng',
+    ultimasOrdens: 'Đơn hàng dịch vụ gần đây',
+    ultimasVendas: 'Bán xe gần đây',
+
+    // Configurações
+    configuracoes_titulo: 'Cài đặt',
+    infoEmpresa: 'Thông tin công ty',
+    nomeEmpresa: 'Tên công ty',
+    endereco: 'Địa chỉ',
+    telefone: 'Điện thoại',
+    numeroAutorizacao: 'Số giấy phép chính thức',
+    salvarInformacoes: 'Lưu thông tin',
+    alterarSenha: 'Đổi mật khẩu',
+    senhaAtual: 'Mật khẩu hiện tại',
+    novaSenha: 'Mật khẩu mới',
+    confirmarSenha: 'Xác nhận mật khẩu mới',
+    alterarSenhaBtn: 'Đổi mật khẩu',
+    backup: 'Sao lưu và khôi phục',
+    backupDownload: 'Sao lưu (Tải xuống)',
+    backupRestore: 'Khôi phục (Tải lên)',
+    restaurando: 'Đang khôi phục...',
+
+    // Usuários
+    usuarios_titulo: 'Người dùng',
+    novoUsuario: 'Người dùng mới',
+    criarUsuario: 'Tạo người dùng',
+    editarUsuario: 'Chỉnh sửa người dùng',
+    nome: 'Tên',
+    email: 'Email',
+    idioma: 'Ngôn ngữ',
+    acao: 'Hành động',
+    editar: 'Chỉnh sửa',
+    deletar: 'Xóa',
+    salvar: 'Lưu',
+    cancelar: 'Hủy',
+    confirmarDelecao: 'Bạn có chắc muốn xóa người dùng này không?',
+    usuarioCriado: 'Người dùng đã được tạo thành công',
+    usuarioAtualizado: 'Người dùng đã được cập nhật thành công',
+    usuarioDeletado: 'Người dùng đã được xóa thành công',
+    erroAoSalvar: 'Lỗi khi lưu người dùng',
+    erroAoDeletar: 'Lỗi khi xóa người dùng',
+
+    // Idiomas
+    portugues: 'Português',
+    filipino: 'Filipino',
+    vietnamita: 'Tiếng Việt',
+    senha: 'Mật khẩu',
   }
 };
 
-export type Language = 'pt' | 'fil';
+export type Language = 'pt' | 'fil' | 'vi';
 
 export const i18n = (language: Language = 'pt') => {
   return {

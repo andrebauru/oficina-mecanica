@@ -9,6 +9,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Paper,
   Chip,
   Button,
@@ -52,7 +53,6 @@ import {
 import {
   calcularResumoRecebivel,
   atualizarStatusParcela,
-  calcularDiasAtraso,
   formatarMoeda,
   formatarDataBR,
   gerarLinkWhatsApp,
@@ -82,6 +82,19 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+interface VendaResumo {
+  vendaId: string;
+  clienteNome: string;
+  clienteTelefone: string;
+  valorTotal: number;
+  proximoVencimento: string;
+  statusGeral: StatusParcela;
+  descricaoParcelas: string;
+  parcelas: Parcela[];
+  totalParcelas: number;
+  parcelasPagas: number;
+}
+
 export const VendasGestao: React.FC = () => {
   
   // Estados
@@ -92,12 +105,14 @@ export const VendasGestao: React.FC = () => {
   const [filtroStatus, setFiltroStatus] = useState<StatusParcela | 'todos'>('todos');
   const [tabAtual, setTabAtual] = useState(0);
   const [contratoDialog, setContratoDialog] = useState(false);
-  const [modalVendaOpen, setModalVendaOpen] = useState(false);
   const [dadosContratoAtual, setDadosContratoAtual] = useState<DadosContrato | null>(null);
   const [parcelaParaBaixa, setParcelaParaBaixa] = useState<Parcela | null>(null);
   const [dialogBaixaOpen, setDialogBaixaOpen] = useState(false);
   const [baixandoParcela, setBaixandoParcela] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'id' | 'cliente' | 'valor' | 'vencimento' | 'status'>('vencimento');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Carregar dados
   useEffect(() => {
@@ -130,31 +145,87 @@ export const VendasGestao: React.FC = () => {
     return calcularResumoRecebivel(parcelas);
   }, [parcelas]);
 
-  // Filtrar parcelas
-  const parcelasFiltradas = useMemo(() => {
-    let resultado = parcelas;
+  // Agrupar parcelas por venda
+  const vendasAgrupadas = useMemo((): VendaResumo[] => {
+    // Agrupar parcelas por vendaId
+    const grupos: Record<string, Parcela[]> = {};
+    parcelas.forEach(p => {
+      if (!grupos[p.vendaId]) grupos[p.vendaId] = [];
+      grupos[p.vendaId].push(p);
+    });
 
-    // Filtrar por status
+    const resultado: VendaResumo[] = Object.entries(grupos).map(([vendaId, parcelasVenda]) => {
+      parcelasVenda.sort((a, b) => a.numeroParcela - b.numeroParcela);
+      const primeiraP = parcelasVenda[0];
+      const totalParcelas = parcelasVenda.length;
+      const parcelasPagas = parcelasVenda.filter(p => p.status === 'pago').length;
+      const restantes = parcelasVenda.filter(p => p.status !== 'pago');
+
+      // Status geral
+      let statusGeral: StatusParcela = 'pago';
+      if (restantes.length > 0) {
+        const temAtrasada = restantes.some(p => atualizarStatusParcela(p) === 'atrasado');
+        statusGeral = temAtrasada ? 'atrasado' : 'pendente';
+      }
+
+      // Próximo vencimento (primeira não paga)
+      const proximoVencimento = restantes.length > 0
+        ? restantes.sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))[0].dataVencimento
+        : parcelasVenda[parcelasVenda.length - 1].dataVencimento;
+
+      // Descrição de parcelas
+      let descricaoParcelas = '';
+      if (totalParcelas === 1) {
+        descricaoParcelas = statusGeral === 'pago' ? '✓ À Vista — Pago' : '◷ À Vista — Pendente';
+      } else if (statusGeral === 'pago') {
+        descricaoParcelas = `✓ ${totalParcelas}/${totalParcelas} Parcelas — Quitado`;
+      } else {
+        const pendentes = totalParcelas - parcelasPagas;
+        descricaoParcelas = parcelasPagas === 0
+          ? `Entrada + ${pendentes - 1} restantes`
+          : `${parcelasPagas}/${totalParcelas} pagas + ${pendentes} restantes`;
+      }
+
+      return {
+        vendaId,
+        clienteNome: primeiraP.clienteNome,
+        clienteTelefone: primeiraP.clienteTelefone,
+        valorTotal: parcelasVenda.reduce((s, p) => s + p.valor, 0),
+        proximoVencimento,
+        statusGeral,
+        descricaoParcelas,
+        parcelas: parcelasVenda,
+        totalParcelas,
+        parcelasPagas
+      };
+    });
+
+    // Filtros
+    let filtrado = resultado;
     if (filtroStatus !== 'todos') {
-      resultado = resultado.filter(p => atualizarStatusParcela(p) === filtroStatus);
+      filtrado = filtrado.filter(v => v.statusGeral === filtroStatus);
     }
-
-    // Filtrar por busca
     if (searchTerm) {
-      resultado = resultado.filter(p =>
-        p.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.clienteTelefone.includes(searchTerm) ||
-        p.id.includes(searchTerm)
+      filtrado = filtrado.filter(v =>
+        v.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.clienteTelefone.includes(searchTerm) ||
+        v.vendaId.includes(searchTerm)
       );
     }
 
-    // Ordenar por data de vencimento
-    return resultado.sort((a, b) => {
-      const dataA = new Date(a.dataVencimento).getTime();
-      const dataB = new Date(b.dataVencimento).getTime();
-      return dataA - dataB;
+    // Ordenação
+    filtrado.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'id') cmp = a.vendaId.localeCompare(b.vendaId);
+      else if (sortBy === 'cliente') cmp = a.clienteNome.localeCompare(b.clienteNome);
+      else if (sortBy === 'valor') cmp = a.valorTotal - b.valorTotal;
+      else if (sortBy === 'vencimento') cmp = a.proximoVencimento.localeCompare(b.proximoVencimento);
+      else if (sortBy === 'status') cmp = a.statusGeral.localeCompare(b.statusGeral);
+      return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [parcelas, filtroStatus, searchTerm]);
+
+    return filtrado;
+  }, [parcelas, filtroStatus, searchTerm, sortBy, sortDir]);
 
   // Cores por status
   const getCorStatus = (status: StatusParcela) => {
@@ -170,6 +241,11 @@ export const VendasGestao: React.FC = () => {
       default:
         return { background: '#ffffff', color: '#000000', label: '' };
     }
+  };
+
+  const handleSort = (col: typeof sortBy) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('asc'); }
   };
 
   // Abrir diálogo de contrato
@@ -267,7 +343,7 @@ export const VendasGestao: React.FC = () => {
 
   // Exportar CSV
   const handleExportarCSV = () => {
-    const csv = exportarParcelasCSV(parcelasFiltradas);
+    const csv = exportarParcelasCSV(parcelas);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -378,19 +454,21 @@ export const VendasGestao: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Abas */}
-      <Card sx={{ mb: 3 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs 
-            value={tabAtual} 
-            onChange={(_, newValue) => setTabAtual(newValue)}
-            aria-label="Abas de gestão"
-          >
-            <Tab label="📊 Dashboard" id="tab-0" />
-            <Tab label="➕ Nova Venda" id="tab-1" />
-          </Tabs>
-        </Box>
+      {/* Abas no topo */}
+      <Paper sx={{ mb: 2, borderRadius: 2 }}>
+        <Tabs 
+          value={tabAtual} 
+          onChange={(_, newValue) => setTabAtual(newValue)}
+          aria-label="Abas de gestão"
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label="📊 Recebíveis" id="tab-0" />
+          <Tab label="➕ Nova Venda" id="tab-1" />
+        </Tabs>
+      </Paper>
 
+      {/* Conteúdo em Card separado */}
+      <Card sx={{ mb: 3 }}>
         {/* Tab 1: Dashboard */}
         <TabPanel value={tabAtual} index={0}>
           {/* Filtros */}
@@ -428,100 +506,107 @@ export const VendasGestao: React.FC = () => {
           {/* Tabela */}
           <TableContainer component={Paper}>
             <Table>
-              <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+              <TableHead sx={{ bgcolor: '#1565c0' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Parcela</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Cliente</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Valor</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Vencimento</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Ações</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700 }}>
+                    <TableSortLabel
+                      active={sortBy === 'id'}
+                      direction={sortBy === 'id' ? sortDir : 'asc'}
+                      onClick={() => handleSort('id')}
+                      sx={{ color: '#fff !important', '& .MuiTableSortLabel-icon': { color: '#fff !important' } }}
+                    >
+                      ID Venda
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700 }}>
+                    <TableSortLabel active={sortBy === 'cliente'} direction={sortBy === 'cliente' ? sortDir : 'asc'} onClick={() => handleSort('cliente')} sx={{ color: '#fff !important', '& .MuiTableSortLabel-icon': { color: '#fff !important' } }}>
+                      Cliente
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell align="right" sx={{ color: '#fff', fontWeight: 700 }}>
+                    <TableSortLabel active={sortBy === 'valor'} direction={sortBy === 'valor' ? sortDir : 'asc'} onClick={() => handleSort('valor')} sx={{ color: '#fff !important', '& .MuiTableSortLabel-icon': { color: '#fff !important' } }}>
+                      Valor Total
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700 }}>
+                    <TableSortLabel active={sortBy === 'vencimento'} direction={sortBy === 'vencimento' ? sortDir : 'asc'} onClick={() => handleSort('vencimento')} sx={{ color: '#fff !important', '& .MuiTableSortLabel-icon': { color: '#fff !important' } }}>
+                      Próx. Vencimento
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700 }}>
+                    <TableSortLabel active={sortBy === 'status'} direction={sortBy === 'status' ? sortDir : 'asc'} onClick={() => handleSort('status')} sx={{ color: '#fff !important', '& .MuiTableSortLabel-icon': { color: '#fff !important' } }}>
+                      Situação
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700 }}>Ações</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {parcelasFiltradas.length === 0 ? (
+                {vendasAgrupadas.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography color="textSecondary">
-                        Nenhuma parcela encontrada
-                      </Typography>
+                      <Typography color="textSecondary">Nenhuma venda encontrada</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  parcelasFiltradas.map((parcela) => {
-                    const status = atualizarStatusParcela(parcela);
-                    const diasAtraso = calcularDiasAtraso(parcela.dataVencimento);
-                    const cor = getCorStatus(status);
+                  vendasAgrupadas.map((venda) => {
+                    const cor = getCorStatus(venda.statusGeral);
+                    const parcelaPendente = venda.parcelas.find(p => atualizarStatusParcela(p) !== 'pago');
+                    const parcelaParaContrato = venda.parcelas[0];
 
                     return (
-                      <TableRow 
-                        key={parcela.id}
-                        sx={{ 
-                          '&:hover': { bgcolor: '#f9f9f9' },
-                          backgroundColor: status === 'atrasado' ? '#fff5f5' : 'inherit'
+                      <TableRow
+                        key={venda.vendaId}
+                        sx={{
+                          '&:hover': { bgcolor: '#f0f4ff' },
+                          backgroundColor: venda.statusGeral === 'atrasado' ? '#fff5f5' : venda.statusGeral === 'pago' ? '#f9fff9' : 'inherit'
                         }}
                       >
-                        <TableCell sx={{ fontWeight: 500 }}>
-                          {parcela.numeroParcela}
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', fontFamily: 'monospace', color: '#555' }}>
+                          {venda.vendaId}
                         </TableCell>
                         <TableCell>
                           <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {parcela.clienteNome}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">
-                              {parcela.clienteTelefone}
-                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{venda.clienteNome}</Typography>
+                            <Typography variant="caption" color="textSecondary">{venda.clienteTelefone}</Typography>
                           </Box>
                         </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600 }}>
-                          {formatarMoeda(parcela.valor)}
+                        <TableCell align="right" sx={{ fontWeight: 700, color: '#1565c0' }}>
+                          {formatarMoeda(venda.valorTotal)}
                         </TableCell>
                         <TableCell>
-                          <Box>
-                            <Typography variant="body2">
-                              {formatarDataBR(parcela.dataVencimento)}
-                            </Typography>
-                            {diasAtraso > 0 && (
-                              <Typography variant="caption" sx={{ color: '#dc3545' }}>
-                                {diasAtraso} dias atrasado
-                              </Typography>
-                            )}
-                          </Box>
+                          <Typography variant="body2">{formatarDataBR(venda.proximoVencimento)}</Typography>
+                          <Typography variant="caption" sx={{ color: '#888' }}>{venda.descricaoParcelas}</Typography>
                         </TableCell>
                         <TableCell>
                           <Chip
                             label={cor.label}
                             size="small"
-                            sx={{
-                              backgroundColor: cor.background,
-                              color: cor.color,
-                              fontWeight: 600
-                            }}
+                            sx={{ backgroundColor: cor.background, color: cor.color, fontWeight: 700 }}
                           />
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {status !== 'pago' && (
+                            {parcelaPendente && (
                               <>
                                 <Tooltip title="Enviar mensagem WhatsApp">
                                   <Button
                                     size="small"
-                                    variant="text"
-                                    startIcon={<MessageCircle size={16} />}
-                                    onClick={() => handleWhatsApp(parcela)}
-                                    sx={{ color: '#25d366' }}
+                                    variant="outlined"
+                                    color="success"
+                                    startIcon={<MessageCircle size={14} />}
+                                    onClick={() => handleWhatsApp(parcelaPendente)}
                                   >
                                     WhatsApp
                                   </Button>
                                 </Tooltip>
-                                <Tooltip title="Registrar pagamento">
+                                <Tooltip title="Registrar pagamento da próxima parcela">
                                   <Button
                                     size="small"
-                                    variant="text"
-                                    startIcon={<CheckCircle size={16} />}
-                                    onClick={() => handleAbrirBaixa(parcela)}
-                                    sx={{ color: '#28a745' }}
+                                    variant="contained"
+                                    color="success"
+                                    startIcon={<CheckCircle size={14} />}
+                                    onClick={() => handleAbrirBaixa(parcelaPendente)}
                                   >
                                     Pagar
                                   </Button>
@@ -531,10 +616,10 @@ export const VendasGestao: React.FC = () => {
                             <Tooltip title="Gerar contrato PDF">
                               <Button
                                 size="small"
-                                variant="text"
-                                startIcon={<FileText size={16} />}
-                                onClick={() => handleAbrirContrato(parcela)}
-                                sx={{ color: '#007bff' }}
+                                variant="contained"
+                                color="primary"
+                                startIcon={<FileText size={14} />}
+                                onClick={() => handleAbrirContrato(parcelaParaContrato)}
                               >
                                 Contrato
                               </Button>
@@ -553,6 +638,8 @@ export const VendasGestao: React.FC = () => {
         {/* Tab 2: Nova Venda */}
         <TabPanel value={tabAtual} index={1}>
           <ModalVenda 
+            open={true}
+            onClose={() => setTabAtual(0)}
             onVendaCriada={async () => {
               await carregarDados();
               setTabAtual(0);
@@ -610,8 +697,6 @@ export const VendasGestao: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Modal de Nova Venda - será criado */}
-      <ModalVenda open={modalVendaOpen} onClose={() => setModalVendaOpen(false)} />
     </Box>
   );
 };
