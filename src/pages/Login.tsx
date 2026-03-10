@@ -59,8 +59,8 @@ const Login = ({ onLogin }: LoginProps) => {
 
   useEffect(() => {
     Promise.all([
-      axios.get('http://152.42.165.18:3000/usuarios').catch(() => ({ data: [] })),
-      axios.get('http://152.42.165.18:3000/configuracoes').catch(() => ({ data: [] })),
+      axios.get('/api/usuarios').catch(() => ({ data: [] })),
+      axios.get('/api/configuracoes').catch(() => ({ data: [] })),
     ]).then(([usersRes, configRes]) => {
       const loadedUsers: UsuarioLogin[] = usersRes.data;
       setUsers(loadedUsers);
@@ -83,14 +83,14 @@ const Login = ({ onLogin }: LoginProps) => {
         if (senha !== confirmar) { setErro('Senhas não coincidem'); setSalvando(false); return; }
         if (senha.length < 4) { setErro('Senha deve ter ao menos 4 caracteres'); setSalvando(false); return; }
 
-        await axios.post('http://152.42.165.18:3000/usuarios', {
+        await axios.post('/api/usuarios', {
           nome: usuario.trim(),
           email: '',
           idioma: 'pt',
           senhaHash: hash
         });
         if (config?.id) {
-          await axios.put(`http://152.42.165.18:3000/configuracoes/${config.id}`, { ...config });
+          await axios.put(`/api/configuracoes/${config.id}`, { ...config });
         }
         sessionStorage.setItem('authenticated', 'true');
         onLogin();

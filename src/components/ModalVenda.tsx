@@ -35,7 +35,7 @@ import {
   formatarDataBR
 } from '../utils/vendas';
 
-const API_URL = 'http://152.42.165.18:3000';
+const API_URL = '/api';
 
 interface ModalVendaProps {
   open?: boolean;

@@ -1,5 +1,5 @@
 // Configuração centralizada da API
-export const API_URL = 'http://152.42.165.18:3000';
+export const API_URL = '/api';
 
 // Função auxiliar para construir URLs da API
 export const getApiEndpoint = (path: string): string => {

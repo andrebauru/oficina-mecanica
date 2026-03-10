@@ -89,7 +89,7 @@ const Usuarios = () => {
   const fetchUsuarios = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('http://152.42.165.18:3000/usuarios');
+      const res = await axios.get('/api/usuarios');
       setUsuarios(res.data);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
@@ -187,7 +187,7 @@ const Usuarios = () => {
       if (editingId) {
         // Atualizar
         await axios.put(
-          `http://152.42.165.18:3000/usuarios/${editingId}`,
+          `/api/usuarios/${editingId}`,
           payload
         );
         setSnackbar({
@@ -197,7 +197,7 @@ const Usuarios = () => {
         });
       } else {
         // Criar
-        await axios.post('http://152.42.165.18:3000/usuarios', payload);
+        await axios.post('/api/usuarios', payload);
         setSnackbar({
           open: true,
           message: t('usuarioCriado'),
@@ -221,7 +221,7 @@ const Usuarios = () => {
   const handleDeleteUsuario = async (id: string) => {
     setDeletingId(id);
     try {
-      await axios.delete(`http://152.42.165.18:3000/usuarios/${id}`);
+      await axios.delete(`/api/usuarios/${id}`);
       setSnackbar({
         open: true,
         message: t('usuarioDeletado'),

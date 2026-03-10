@@ -53,10 +53,10 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         const [clientesRes, veiculosRes, ordensRes, vendasRes] = await Promise.all([
-          axios.get('http://152.42.165.18:3000/clientes'),
-          axios.get('http://152.42.165.18:3000/veiculos'),
-          axios.get('http://152.42.165.18:3000/ordens_servico'),
-          axios.get('http://152.42.165.18:3000/vendas_carros')
+          axios.get('/api/clientes'),
+          axios.get('/api/veiculos'),
+          axios.get('/api/ordens_servico'),
+          axios.get('/api/vendas_carros')
         ]);
 
         setClientes(clientesRes.data);

@@ -77,7 +77,7 @@ const Pecas = () => {
   const fetchPecas = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://152.42.165.18:3000/pecas');
+      const response = await axios.get('/api/pecas');
       setPecas(response.data);
     } catch (error) {
       console.error('Erro ao buscar peças:', error);
@@ -158,14 +158,14 @@ const Pecas = () => {
   const handleSubmit = async () => {
     try {
       if (editingId) {
-        await axios.put(`http://152.42.165.18:3000/pecas/${editingId}`, formData);
+        await axios.put(`/api/pecas/${editingId}`, formData);
         setSnackbar({
           open: true,
           message: 'Peça atualizada com sucesso',
           severity: 'success'
         });
       } else {
-        await axios.post('http://152.42.165.18:3000/pecas', formData);
+        await axios.post('/api/pecas', formData);
         setSnackbar({
           open: true,
           message: 'Peça adicionada com sucesso',
@@ -197,7 +197,7 @@ const Pecas = () => {
   const handleDelete = async () => {
     if (pecaParaDeletar) {
       try {
-        await axios.delete(`http://152.42.165.18:3000/pecas/${pecaParaDeletar}`);
+        await axios.delete(`/api/pecas/${pecaParaDeletar}`);
         setSnackbar({
           open: true,
           message: 'Peça excluída com sucesso',

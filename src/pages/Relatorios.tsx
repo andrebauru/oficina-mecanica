@@ -193,7 +193,7 @@ const Relatorios: React.FC = () => {
     const fetchTransacoes = useCallback(async (): Promise<string[]> => {
         setLoading(true);
         try {
-            const res = await axios.get('http://152.42.165.18:3000/financeiro');
+            const res = await axios.get('/api/financeiro');
             const data = res.data as Transacao[];
             setTransacoes(data);
             const years = [...new Set(data.map((t: Transacao) => t.data.split('-')[0]))].sort().reverse();
@@ -345,10 +345,10 @@ const Relatorios: React.FC = () => {
         try {
             const payload = { ...formData, valor: Number(formData.valor) };
             if (editingId) {
-                await axios.put(`http://152.42.165.18:3000/financeiro/${editingId}`, payload);
+                await axios.put(`/api/financeiro/${editingId}`, payload);
                 setSnackbar({ open: true, message: `${TEXTS.updateSuccess.jp} / ${TEXTS.updateSuccess.pt}`, severity: 'success' });
             } else {
-                await axios.post('http://152.42.165.18:3000/financeiro', payload);
+                await axios.post('/api/financeiro', payload);
                 setSnackbar({ open: true, message: `${TEXTS.addSuccess.jp} / ${TEXTS.addSuccess.pt}`, severity: 'success' });
             }
             handleCloseForm();
@@ -361,7 +361,7 @@ const Relatorios: React.FC = () => {
     const handleDelete = async () => {
         if (!transacaoParaDeletar) return;
         try {
-            await axios.delete(`http://152.42.165.18:3000/financeiro/${transacaoParaDeletar}`);
+            await axios.delete(`/api/financeiro/${transacaoParaDeletar}`);
             setSnackbar({ open: true, message: `${TEXTS.deleteSuccess.jp} / ${TEXTS.deleteSuccess.pt}`, severity: 'success' });
             fetchTransacoes();
         } catch {

@@ -114,7 +114,7 @@ const VendasCarros = () => {
   const fetchVendasCarros = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://152.42.165.18:3000/vendas_carros');
+      const response = await axios.get('/api/vendas_carros');
       setVendasCarros(response.data);
     } catch (error) {
       console.error('Erro ao buscar vendas de carros:', error);
@@ -130,7 +130,7 @@ const VendasCarros = () => {
 
   useEffect(() => {
     fetchVendasCarros();
-    axios.get('http://152.42.165.18:3000/clientes')
+    axios.get('/api/clientes')
       .then(res => setClientes(res.data))
       .catch(() => {});
   }, []);
@@ -208,14 +208,14 @@ const VendasCarros = () => {
       };
 
       if (editingId) {
-        await axios.put(`http://152.42.165.18:3000/vendas_carros/${editingId}`, dataToSubmit);
+        await axios.put(`/api/vendas_carros/${editingId}`, dataToSubmit);
         setSnackbar({
           open: true,
           message: 'Venda de carro atualizada com sucesso',
           severity: 'success'
         });
       } else {
-        await axios.post('http://152.42.165.18:3000/vendas_carros', dataToSubmit);
+        await axios.post('/api/vendas_carros', dataToSubmit);
         setSnackbar({
           open: true,
           message: 'Venda de carro adicionada com sucesso',
@@ -246,7 +246,7 @@ const VendasCarros = () => {
   const handleDelete = async () => {
     if (vendaCarroParaDeletar) {
       try {
-        await axios.delete(`http://152.42.165.18:3000/vendas_carros/${vendaCarroParaDeletar}`);
+        await axios.delete(`/api/vendas_carros/${vendaCarroParaDeletar}`);
         setSnackbar({
           open: true,
           message: 'Venda de carro excluída com sucesso',
@@ -281,7 +281,7 @@ const VendasCarros = () => {
     const updated = [...current];
     updated[index] = !updated[index];
     try {
-      await axios.patch(`http://152.42.165.18:3000/vendas_carros/${venda.id}`, { parcelasStatus: updated });
+      await axios.patch(`/api/vendas_carros/${venda.id}`, { parcelasStatus: updated });
       fetchVendasCarros();
     } catch {
       setSnackbar({ open: true, message: 'Erro ao atualizar pagamento', severity: 'error' });

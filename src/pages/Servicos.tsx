@@ -81,7 +81,7 @@ const Servicos = () => {
   const fetchServicos = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://152.42.165.18:3000/servicos');
+      const response = await axios.get('/api/servicos');
       setServicos(response.data);
       setServicosFiltrados(response.data);
     } catch (error) {
@@ -132,14 +132,14 @@ const Servicos = () => {
   const handleSubmit = async () => {
     try {
       if (editingId) {
-        await axios.put(`http://152.42.165.18:3000/servicos/${editingId}`, formData);
+        await axios.put(`/api/servicos/${editingId}`, formData);
         setSnackbar({
           open: true,
           message: 'Serviço atualizado com sucesso',
           severity: 'success'
         });
       } else {
-        await axios.post('http://152.42.165.18:3000/servicos', formData);
+        await axios.post('/api/servicos', formData);
         setSnackbar({
           open: true,
           message: 'Serviço adicionado com sucesso',
@@ -171,7 +171,7 @@ const Servicos = () => {
   const handleDelete = async () => {
     if (servicoParaDeletar) {
       try {
-        await axios.delete(`http://152.42.165.18:3000/servicos/${servicoParaDeletar}`);
+        await axios.delete(`/api/servicos/${servicoParaDeletar}`);
         setSnackbar({
           open: true,
           message: 'Serviço excluído com sucesso',

@@ -90,7 +90,7 @@ const Financeiro = () => {
   const fetchLancamentos = async () => {
     setLancLoading(true);
     try {
-      const res = await axios.get('http://152.42.165.18:3000/financeiro');
+      const res = await axios.get('/api/financeiro');
       setLancamentos(res.data);
     } catch { showMsg('Erro ao carregar lançamentos', 'error'); }
     finally { setLancLoading(false); }
@@ -99,7 +99,7 @@ const Financeiro = () => {
   const fetchCategorias = async () => {
     setCatLoading(true);
     try {
-      const res = await axios.get('http://152.42.165.18:3000/categorias_financeiro');
+      const res = await axios.get('/api/categorias_financeiro');
       setCategorias(res.data);
     } catch { showMsg('Erro ao carregar categorias', 'error'); }
     finally { setCatLoading(false); }
@@ -164,10 +164,10 @@ const Financeiro = () => {
     const payload = { ...lancForm, valor: Number(lancForm.valor) };
     try {
       if (lancEditingId) {
-        await axios.put(`http://152.42.165.18:3000/financeiro/${lancEditingId}`, payload);
+        await axios.put(`/api/financeiro/${lancEditingId}`, payload);
         showMsg('Lançamento atualizado');
       } else {
-        await axios.post('http://152.42.165.18:3000/financeiro', payload);
+        await axios.post('/api/financeiro', payload);
         showMsg('Lançamento adicionado');
       }
       setOpenLancForm(false);
@@ -178,7 +178,7 @@ const Financeiro = () => {
   const handleDeleteLanc = async () => {
     if (!lancParaDeletar) return;
     try {
-      await axios.delete(`http://152.42.165.18:3000/financeiro/${lancParaDeletar}`);
+      await axios.delete(`/api/financeiro/${lancParaDeletar}`);
       showMsg('Lançamento excluído');
       fetchLancamentos();
     } catch { showMsg('Erro ao excluir', 'error'); }
@@ -197,10 +197,10 @@ const Financeiro = () => {
     if (!catForm.nome.trim()) { showMsg('Informe o nome da categoria', 'error'); return; }
     try {
       if (catEditingId) {
-        await axios.put(`http://152.42.165.18:3000/categorias_financeiro/${catEditingId}`, catForm);
+        await axios.put(`/api/categorias_financeiro/${catEditingId}`, catForm);
         showMsg('Categoria atualizada');
       } else {
-        await axios.post('http://152.42.165.18:3000/categorias_financeiro', catForm);
+        await axios.post('/api/categorias_financeiro', catForm);
         showMsg('Categoria adicionada');
       }
       setOpenCatForm(false);
@@ -211,7 +211,7 @@ const Financeiro = () => {
   const handleDeleteCat = async () => {
     if (!catParaDeletar) return;
     try {
-      await axios.delete(`http://152.42.165.18:3000/categorias_financeiro/${catParaDeletar}`);
+      await axios.delete(`/api/categorias_financeiro/${catParaDeletar}`);
       showMsg('Categoria excluída');
       fetchCategorias();
     } catch { showMsg('Erro ao excluir', 'error'); }

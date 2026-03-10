@@ -64,7 +64,7 @@ const Configuracoes = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    axios.get('http://152.42.165.18:3000/configuracoes')
+    axios.get('/api/configuracoes')
       .then(res => {
         const items: Configuracao[] = res.data;
         if (items.length > 0) {
@@ -85,10 +85,10 @@ const Configuracoes = () => {
     try {
       const updated = { ...config, ...formData };
       if (config.id) {
-        await axios.put(`http://152.42.165.18:3000/configuracoes/${config.id}`, updated);
+        await axios.put(`/api/configuracoes/${config.id}`, updated);
         setConfig(updated);
       } else {
-        const res = await axios.post('http://152.42.165.18:3000/configuracoes', updated);
+        const res = await axios.post('/api/configuracoes', updated);
         setConfig(res.data);
       }
       setSnackbar({ open: true, message: 'Informações da empresa salvas', severity: 'success' });
@@ -124,9 +124,9 @@ const Configuracoes = () => {
       const hashNova = hashPassword(novaSenha);
       const updated = { ...config, senhaHash: hashNova };
       if (config.id) {
-        await axios.put(`http://152.42.165.18:3000/configuracoes/${config.id}`, updated);
+        await axios.put(`/api/configuracoes/${config.id}`, updated);
       } else {
-        const res = await axios.post('http://152.42.165.18:3000/configuracoes', updated);
+        const res = await axios.post('/api/configuracoes', updated);
         setConfig(res.data);
       }
       setConfig(prev => ({ ...prev, senhaHash: hashNova }));
@@ -147,7 +147,7 @@ const Configuracoes = () => {
     try {
       const results = await Promise.all(
         COLLECTIONS.map(col =>
-          axios.get(`http://152.42.165.18:3000/${col}`).then(r => ({ [col]: r.data }))
+          axios.get(`/api/${col}`).then(r => ({ [col]: r.data }))
         )
       );
       const db = Object.assign({}, ...results);
@@ -182,15 +182,15 @@ const Configuracoes = () => {
 
       for (const col of collections) {
         const newItems: { id: string }[] = db[col];
-        const existing: { id: string }[] = await axios.get(`http://152.42.165.18:3000/${col}`)
+        const existing: { id: string }[] = await axios.get(`/api/${col}`)
           .then(r => r.data)
           .catch(() => []);
 
         for (const item of existing) {
-          await axios.delete(`http://152.42.165.18:3000/${col}/${item.id}`).catch(() => {});
+          await axios.delete(`/api/${col}/${item.id}`).catch(() => {});
         }
         for (const item of newItems) {
-          await axios.post(`http://152.42.165.18:3000/${col}`, item).catch(() => {});
+          await axios.post(`/api/${col}`, item).catch(() => {});
         }
       }
       setSnackbar({ open: true, message: 'Restauração concluída com sucesso — recarregue a página', severity: 'success' });
