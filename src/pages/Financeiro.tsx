@@ -12,6 +12,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import { formatCurrency } from '../utils/formatters';
+import { useLanguage } from '../components/LanguageContext';
 
 /* ─── Interfaces ─── */
 interface Lancamento {
@@ -56,6 +57,7 @@ const categoriaVazia: CategoriaForm = { nome: '', tipo: 'Saída' };
 
 /* ═══════════════════════════════════════════ */
 const Financeiro = () => {
+  const { t } = useLanguage();
   const [tab, setTab] = useState(0);
 
   /* ── Lançamentos state ── */
@@ -252,7 +254,7 @@ const Financeiro = () => {
   return (
     <Box sx={{ flexGrow: 1 }}>
       <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }} gutterBottom fontWeight="bold">
-        Financeiro
+        {t('financeiro_titulo')}
       </Typography>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
@@ -282,13 +284,13 @@ const Financeiro = () => {
           </Box>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenLancForm()}
             sx={{ width: { xs: '100%', sm: 'auto' } }}>
-            Novo Lançamento
+            {t('novoLancamento')}
           </Button>
         </Box>
 
         {/* Busca */}
         <Box sx={{ mb: 2 }}>
-          <TextField fullWidth variant="outlined" placeholder="Buscar por categoria, tipo, descrição ou data"
+          <TextField fullWidth variant="outlined" placeholder={`${t('buscarPlaceholder')} ${t('categoria').toLowerCase()}, ${t('tipo').toLowerCase()}, ${t('descricao').toLowerCase()}`}
             value={lancFiltro} onChange={e => setLancFiltro(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
         </Box>
@@ -326,7 +328,7 @@ const Financeiro = () => {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={6} align="center">Nenhum lançamento encontrado</TableCell>
+                    <TableCell colSpan={6} align="center">{t('nenhumRegistro')}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -341,12 +343,12 @@ const Financeiro = () => {
           <Typography variant="h6">Tipos de Despesa / Categoria</Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenCatForm()}
             sx={{ width: { xs: '100%', sm: 'auto' } }}>
-            Nova Categoria
+            {t('novaCategoria')}
           </Button>
         </Box>
 
         <Box sx={{ mb: 2 }}>
-          <TextField fullWidth variant="outlined" placeholder="Buscar categoria"
+          <TextField fullWidth variant="outlined" placeholder={`${t('buscarPlaceholder')} ${t('categoria').toLowerCase()}`}
             value={catFiltro} onChange={e => setCatFiltro(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
         </Box>
@@ -376,7 +378,7 @@ const Financeiro = () => {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={3} align="center">Nenhuma categoria cadastrada</TableCell>
+                    <TableCell colSpan={3} align="center">{t('nenhumRegistro')}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -387,7 +389,7 @@ const Financeiro = () => {
 
       {/* ══ Dialog — Lançamento ══ */}
       <Dialog open={openLancForm} onClose={() => setOpenLancForm(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{lancEditingId ? 'Editar Lançamento' : 'Novo Lançamento'}</DialogTitle>
+        <DialogTitle>{lancEditingId ? `${t('editar')} Lançamento` : t('novoLancamento')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <TextField label="Data" type="date" fullWidth
             value={lancForm.data}
@@ -422,8 +424,8 @@ const Financeiro = () => {
             onChange={e => setLancForm(p => ({ ...p, descricao: e.target.value }))} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenLancForm(false)} color="inherit">Cancelar</Button>
-          <Button onClick={handleSaveLanc} variant="contained">Salvar</Button>
+          <Button onClick={() => setOpenLancForm(false)} color="inherit">{t('cancelar')}</Button>
+          <Button onClick={handleSaveLanc} variant="contained">{t('salvar')}</Button>
         </DialogActions>
       </Dialog>
 
@@ -439,7 +441,7 @@ const Financeiro = () => {
 
       {/* ══ Dialog — Categoria ══ */}
       <Dialog open={openCatForm} onClose={() => setOpenCatForm(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>{catEditingId ? 'Editar Categoria' : 'Nova Categoria'}</DialogTitle>
+        <DialogTitle>{catEditingId ? `${t('editar')} ${t('categoria')}` : t('novaCategoria')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <TextField label="Nome da Categoria" fullWidth
             value={catForm.nome}
@@ -455,8 +457,8 @@ const Financeiro = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenCatForm(false)} color="inherit">Cancelar</Button>
-          <Button onClick={handleSaveCat} variant="contained">Salvar</Button>
+          <Button onClick={() => setOpenCatForm(false)} color="inherit">{t('cancelar')}</Button>
+          <Button onClick={handleSaveCat} variant="contained">{t('salvar')}</Button>
         </DialogActions>
       </Dialog>
 

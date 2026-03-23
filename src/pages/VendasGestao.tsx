@@ -58,6 +58,7 @@ import {
   gerarLinkWhatsApp,
   exportarParcelasCSV
 } from '../utils/vendas';
+import { useLanguage } from '../components/LanguageContext';
 
 const API_URL = '/api';
 
@@ -96,6 +97,7 @@ interface VendaResumo {
 }
 
 export const VendasGestao: React.FC = () => {
+  const { t } = useLanguage();
   
   // Estados
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
@@ -368,7 +370,7 @@ export const VendasGestao: React.FC = () => {
       {/* Cabeçalho */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
-          💰 Gestão de Vendas e Recebíveis
+          💰 {t('gestaoVendas_titulo')}
         </Typography>
       </Box>
 
@@ -462,8 +464,8 @@ export const VendasGestao: React.FC = () => {
           aria-label="Abas de gestão"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab label="📊 Recebíveis" id="tab-0" />
-          <Tab label="➕ Nova Venda" id="tab-1" />
+          <Tab label={`📊 ${t('recebiveis')}`} id="tab-0" />
+          <Tab label={`➕ ${t('novaVenda')}`} id="tab-1" />
         </Tabs>
       </Paper>
 

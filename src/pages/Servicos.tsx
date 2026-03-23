@@ -31,6 +31,7 @@ import PrintIcon from '@mui/icons-material/Print'; // Ícone de impressão
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'; // Ícone de voltar
 import { formatCurrency } from '../utils/formatters'; 
 import HirataLogo from '../assets/Hirata Logo.svg'; // Importar o logo
+import { useLanguage } from '../components/LanguageContext';
 
 interface Servico {
   id: string;
@@ -55,6 +56,7 @@ const servicoVazio: ServicoFormData = {
 };
 
 const Servicos = () => {
+  const { t } = useLanguage();
   const [servicos, setServicos] = useState<Servico[]>([]);
   const [servicosFiltrados, setServicosFiltrados] = useState<Servico[]>([]);
   const [loading, setLoading] = useState(true);
@@ -300,7 +302,7 @@ const Servicos = () => {
     <Box sx={{ flexGrow: 1 }}>
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: 3 }}>
         <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }} gutterBottom>
-          Serviços
+          {t('servicos_titulo')}
         </Typography>
         <Button
           variant="contained"
@@ -310,7 +312,7 @@ const Servicos = () => {
           fullWidth={window.innerWidth < 600}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          Novo Serviço
+          {t('novoServico')}
         </Button>
       </Box>
       
@@ -318,7 +320,7 @@ const Servicos = () => {
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Buscar serviços por nome, descrição, valor ou tempo estimado"
+          placeholder={`${t('buscarPlaceholder')} ${t('servicos_titulo').toLowerCase()}`}
           value={filtro}
           onChange={handleFiltroChange}
           InputProps={{
@@ -347,7 +349,7 @@ const Servicos = () => {
                     direction={ordenacao.campo === 'nome' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('nome')}
                   >
-                    Nome
+                    {t('nome')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -356,7 +358,7 @@ const Servicos = () => {
                     direction={ordenacao.campo === 'descricao' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('descricao')}
                   >
-                    Descrição
+                    {t('descricao')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -365,7 +367,7 @@ const Servicos = () => {
                     direction={ordenacao.campo === 'valor' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('valor')}
                   >
-                    Valor
+                    {t('valor')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -374,10 +376,10 @@ const Servicos = () => {
                     direction={ordenacao.campo === 'tempoEstimado' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('tempoEstimado')}
                   >
-                    Tempo Estimado
+                    {t('tempoEstimado')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="center">Ações</TableCell>
+                <TableCell align="center">{t('acao')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -417,7 +419,7 @@ const Servicos = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
-                    Nenhum serviço cadastrado
+                    {t('nenhumRegistro')}
                   </TableCell>
                 </TableRow>
               )}
@@ -428,13 +430,13 @@ const Servicos = () => {
 
       {/* Formulário de Serviço */}
       <Dialog open={openForm} onClose={handleCloseForm} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? 'Editar Serviço' : 'Novo Serviço'}</DialogTitle>
+        <DialogTitle>{editingId ? `${t('editar')} ${t('servicos_titulo').slice(0, -1)}` : t('novoServico')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
             name="nome"
-            label="Nome do Serviço"
+            label={t('nome')}
             type="text"
             fullWidth
             variant="outlined"
@@ -445,7 +447,7 @@ const Servicos = () => {
           <TextField
             margin="dense"
             name="descricao"
-            label="Descrição"
+            label={t('descricao')}
             type="text"
             fullWidth
             multiline
@@ -458,7 +460,7 @@ const Servicos = () => {
           <TextField
             margin="dense"
             name="valor"
-            label="Valor"
+            label={t('valor')}
             type="number"
             fullWidth
             variant="outlined"
@@ -469,7 +471,7 @@ const Servicos = () => {
           <TextField
             margin="dense"
             name="tempoEstimado"
-            label="Tempo Estimado"
+            label={t('tempoEstimado')}
             type="text"
             fullWidth
             variant="outlined"
@@ -480,10 +482,10 @@ const Servicos = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseForm} color="inherit">
-            Cancelar
+            {t('cancelar')}
           </Button>
           <Button onClick={handleSubmit} color="primary" variant="contained">
-            Salvar
+            {t('salvar')}
           </Button>
         </DialogActions>
       </Dialog>

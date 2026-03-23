@@ -28,6 +28,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import { formatCurrency } from '../utils/formatters'; // Importar a função de formatação de moeda
+import { useLanguage } from '../components/LanguageContext';
 
 interface Peca {
   id: string;
@@ -55,6 +56,7 @@ const pecaVazia: PecaFormData = {
 };
 
 const Pecas = () => {
+  const { t } = useLanguage();
   const [pecas, setPecas] = useState<Peca[]>([]);
   const [pecasFiltradas, setPecasFiltradas] = useState<Peca[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +236,7 @@ const Pecas = () => {
     <Box sx={{ flexGrow: 1 }}>
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: 3 }}>
         <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }} gutterBottom>
-          Peças
+          {t('pecas_titulo')}
         </Typography>
         <Button
           variant="contained"
@@ -244,7 +246,7 @@ const Pecas = () => {
           fullWidth={window.innerWidth < 600}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          Nova Peça
+          {t('novaPeca')}
         </Button>
       </Box>
 
@@ -252,7 +254,7 @@ const Pecas = () => {
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Buscar peças por nome, código, marca, preço ou quantidade"
+          placeholder={`${t('buscarPlaceholder')} ${t('pecas_titulo').toLowerCase()}`}
           value={filtro}
           onChange={handleFiltroChange}
           InputProps={{
@@ -281,7 +283,7 @@ const Pecas = () => {
                     direction={ordenacao.campo === 'nome' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('nome')}
                   >
-                    Nome
+                    {t('nome')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -290,7 +292,7 @@ const Pecas = () => {
                     direction={ordenacao.campo === 'codigo' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('codigo')}
                   >
-                    Código
+                    {t('codigo')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -299,7 +301,7 @@ const Pecas = () => {
                     direction={ordenacao.campo === 'marca' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('marca')}
                   >
-                    Marca
+                    {t('marca')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -308,7 +310,7 @@ const Pecas = () => {
                     direction={ordenacao.campo === 'preco' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('preco')}
                   >
-                    Preço
+                    {t('preco')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -317,10 +319,10 @@ const Pecas = () => {
                     direction={ordenacao.campo === 'quantidade' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('quantidade')}
                   >
-                    Quantidade
+                    {t('quantidade')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="center">Ações</TableCell>
+                <TableCell align="center">{t('acao')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -358,7 +360,7 @@ const Pecas = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
-                    Nenhuma peça cadastrada
+                    {t('nenhumRegistro')}
                   </TableCell>
                 </TableRow>
               )}
@@ -369,13 +371,13 @@ const Pecas = () => {
 
       {/* Formulário de Peça */}
       <Dialog open={openForm} onClose={handleCloseForm} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? 'Editar Peça' : 'Nova Peça'}</DialogTitle>
+        <DialogTitle>{editingId ? `${t('editar')} ${t('pecas_titulo').slice(0, -1)}` : t('novaPeca')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
             name="nome"
-            label="Nome da Peça"
+            label={t('nome')}
             type="text"
             fullWidth
             variant="outlined"
@@ -386,7 +388,7 @@ const Pecas = () => {
           <TextField
             margin="dense"
             name="codigo"
-            label="Código"
+            label={t('codigo')}
             type="text"
             fullWidth
             variant="outlined"
@@ -397,7 +399,7 @@ const Pecas = () => {
           <TextField
             margin="dense"
             name="marca"
-            label="Marca"
+            label={t('marca')}
             type="text"
             fullWidth
             variant="outlined"
@@ -408,7 +410,7 @@ const Pecas = () => {
           <TextField
             margin="dense"
             name="preco"
-            label="Preço"
+            label={t('preco')}
             type="number"
             fullWidth
             variant="outlined"
@@ -419,7 +421,7 @@ const Pecas = () => {
           <TextField
             margin="dense"
             name="quantidade"
-            label="Quantidade"
+            label={t('quantidade')}
             type="number"
             fullWidth
             variant="outlined"
@@ -429,10 +431,10 @@ const Pecas = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseForm} color="inherit">
-            Cancelar
+            {t('cancelar')}
           </Button>
           <Button onClick={handleSubmit} color="primary" variant="contained">
-            Salvar
+            {t('salvar')}
           </Button>
         </DialogActions>
       </Dialog>

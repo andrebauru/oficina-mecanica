@@ -31,6 +31,7 @@ import html2pdf from 'html2pdf.js';
 import HirataLogoRaw from '../assets/Hirata Logo.svg?raw';
 const LOGO_DATA_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(HirataLogoRaw)}`;
 import { formatCurrency } from '../utils/formatters';
+import { useLanguage } from '../components/LanguageContext';
 
 interface OrdemServico {
   id: string;
@@ -70,6 +71,7 @@ const tiposRelatorio = [
 ];
 
 const GerarRelatorio = () => {
+  const { t } = useLanguage();
   const [tipo, setTipo] = useState('servicos');
   const [filtro, setFiltro] = useState('');
   const [dataInicio, setDataInicio] = useState<Dayjs | null>(null);
@@ -151,7 +153,7 @@ const GerarRelatorio = () => {
 
   return (
     <Box sx={{ maxWidth: 960, mx: 'auto', mt: 4, p: 2 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">Gerar Relatório PDF</Typography>
+      <Typography variant="h4" gutterBottom fontWeight="bold">{t('gerarRelatorio')}</Typography>
 
       {/* Controls — fora do #relatorio-pdf, nunca exportados */}
       <Card sx={{ mb: 3 }}>
@@ -159,33 +161,33 @@ const GerarRelatorio = () => {
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6} md={4}>
               <FormControl fullWidth>
-                <InputLabel id="tipo-label">Tipo de Relatório</InputLabel>
-                <Select labelId="tipo-label" value={tipo} label="Tipo de Relatório" onChange={handleTipoChange}>
+                <InputLabel id="tipo-label">{t('tipoRelatorio')}</InputLabel>
+                <Select labelId="tipo-label" value={tipo} label={t('tipoRelatorio')} onChange={handleTipoChange}>
                   {tiposRelatorio.map(t => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={6} md={8}>
-              <TextField fullWidth label="Filtro de texto (opcional)" value={filtro}
+              <TextField fullWidth label={t('filtroTextoOpcional')} value={filtro}
                 onChange={e => setFiltro(e.target.value)}
                 placeholder="Status, descrição, fabricante, modelo..." />
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
-                <DatePicker label="Data Início" value={dataInicio} onChange={v => setDataInicio(v)}
+                <DatePicker label={t('dataInicio')} value={dataInicio} onChange={v => setDataInicio(v)}
                   maxDate={dataFim ?? undefined} slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
               <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="pt-br">
-                <DatePicker label="Data Fim" value={dataFim} onChange={v => setDataFim(v)}
+                <DatePicker label={t('dataFim')} value={dataFim} onChange={v => setDataFim(v)}
                   minDate={dataInicio ?? undefined} slotProps={{ textField: { fullWidth: true } }} />
               </LocalizationProvider>
             </Grid>
             <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'center' }}>
               <Button variant="contained" color="primary" startIcon={<PictureAsPdfIcon />}
                 fullWidth onClick={handleGerarPDF} sx={{ height: 56 }} disabled={loading}>
-                Gerar PDF
+                {t('gerarPdf')}
               </Button>
             </Grid>
           </Grid>

@@ -35,10 +35,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import { useSearchParams } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatters';
+import HirataLogo from '../assets/Hirata Logo.svg';
+import { baixarReciboVendaPDF, gerarReciboVendaImagem, gerarReciboVendaPDF } from '../utils/gerarReciboVendaPDF';
+import { sanitizeMultilineText, sanitizeNumber, sanitizeText } from '../utils/security';
 
 interface VendaCarro {
   id: number;
   valor: number;
+  valorPago?: number;
   fabricante: string;
   modelo: string;
   ano: number;
@@ -49,10 +53,15 @@ interface VendaCarro {
   parcelasStatus?: boolean[];
   clienteId?: string;
   clienteNome?: string;
+  clienteTelefone?: string;
+  clienteEndereco?: string;
+  reciboPDF?: string;
+  reciboGeradoEm?: string;
 }
 
 interface VendaCarroFormData {
   valor: number | '';
+  valorPago: number | '';
   fabricante: string;
   modelo: string;
   ano: number | '';
@@ -63,8 +72,16 @@ interface VendaCarroFormData {
   clienteNome: string;
 }
 
+interface ConfiguracaoEmpresa {
+  nomeEmpresa?: string;
+  endereco?: string;
+  telefone?: string;
+  numeroAutorizacao?: string;
+}
+
 const vendaCarroVazio: VendaCarroFormData = {
   valor: '',
+  valorPago: '',
   fabricante: '',
   modelo: '',
   ano: '',
@@ -103,6 +120,7 @@ const VendasCarros = () => {
   });
   const [clientes, setClientes] = useState<Array<{id: string; nome: string; telefone?: string; endereco?: string}>>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<{id: string; nome: string; telefone?: string; endereco?: string} | null>(null);
+  const [configEmpresa, setConfigEmpresa] = useState<ConfiguracaoEmpresa>({});
 
   // Cálculo automático de valorTotal e valorParcela
   const valorBase = Number(formData.valor) || 0;
@@ -130,8 +148,14 @@ const VendasCarros = () => {
 
   useEffect(() => {
     fetchVendasCarros();
-    axios.get('/api/clientes')
-      .then(res => setClientes(res.data))
+    Promise.all([
+      axios.get('/api/clientes').catch(() => ({ data: [] })),
+      axios.get('/api/configuracoes').catch(() => ({ data: [] }))
+    ])
+      .then(([clientesRes, configRes]) => {
+        setClientes(clientesRes.data);
+        setConfigEmpresa(configRes.data?.[0] || {});
+      })
       .catch(() => {});
   }, []);
 
@@ -156,6 +180,7 @@ const VendasCarros = () => {
     if (vendaCarro) {
       setFormData({
         valor: vendaCarro.valor,
+        valorPago: vendaCarro.valorPago ?? vendaCarro.valor,
         fabricante: vendaCarro.fabricante,
         modelo: vendaCarro.modelo,
         ano: vendaCarro.ano,
@@ -180,7 +205,7 @@ const VendasCarros = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numericFields = ['valor', 'ano', 'kilometragem', 'parcelas', 'juros'];
+    const numericFields = ['valor', 'valorPago', 'ano', 'kilometragem', 'parcelas', 'juros'];
     setFormData(prev => ({
       ...prev,
       [name]: numericFields.includes(name) ? (value === '' ? '' : Number(value)) : value
@@ -196,7 +221,10 @@ const VendasCarros = () => {
 
       const dataToSubmit = {
         ...formData,
-        valor: Number(formData.valor),
+        valor: sanitizeNumber(Number(formData.valor), { min: 0 }),
+        valorPago: sanitizeNumber(Number(formData.valorPago), { min: 0, max: valorTotal }),
+        fabricante: sanitizeText(formData.fabricante, 80),
+        modelo: sanitizeText(formData.modelo, 80),
         ano: Number(formData.ano),
         kilometragem: Number(formData.kilometragem),
         parcelas: newParcelas,
@@ -204,7 +232,9 @@ const VendasCarros = () => {
         valorTotal,
         parcelasStatus,
         clienteId: formData.clienteId || undefined,
-        clienteNome: formData.clienteNome || undefined,
+        clienteNome: sanitizeText(formData.clienteNome || '', 100) || undefined,
+        clienteTelefone: sanitizeText(clienteSelecionado?.telefone || '', 40) || undefined,
+        clienteEndereco: sanitizeMultilineText(clienteSelecionado?.endereco || '', 250) || undefined,
       };
 
       if (editingId) {
@@ -215,10 +245,59 @@ const VendasCarros = () => {
           severity: 'success'
         });
       } else {
-        await axios.post('/api/vendas_carros', dataToSubmit);
+        const response = await axios.post('/api/vendas_carros', dataToSubmit);
+        const vendaCriada = response.data;
+
+        try {
+          const tipoVenda = (newParcelas > 1 ? 'parcelado' : 'vista') as 'parcelado' | 'vista';
+          const reciboDados = {
+            logoUrl: HirataLogo,
+            nomeEmpresa: configEmpresa.nomeEmpresa,
+            enderecoEmpresa: configEmpresa.endereco,
+            telefoneEmpresa: configEmpresa.telefone,
+            numeroAutorizacao: configEmpresa.numeroAutorizacao,
+            clienteNome: clienteSelecionado?.nome || formData.clienteNome || 'Cliente',
+            clienteTelefone: clienteSelecionado?.telefone,
+            clienteEndereco: clienteSelecionado?.endereco,
+            numeroVenda: String(vendaCriada.id),
+            dataVenda: new Date().toISOString(),
+            descricaoVeiculo: `${formData.fabricante} ${formData.modelo} (${formData.ano})`,
+            tipoVenda,
+            valorTotal,
+            valorPago: sanitizeNumber(Number(formData.valorPago), { min: 0, max: valorTotal }),
+            observacoes: `Quilometragem: ${formData.kilometragem} km`,
+          };
+
+          const reciboBlob = await gerarReciboVendaPDF(reciboDados);
+          const reciboImagem = await gerarReciboVendaImagem(reciboDados);
+
+          const reciboPDF = baixarReciboVendaPDF(reciboBlob, String(vendaCriada.id), clienteSelecionado?.nome || formData.clienteNome || 'cliente');
+          await axios.patch(`/api/vendas_carros/${vendaCriada.id}`, {
+            reciboPDF,
+            reciboGeradoEm: new Date().toISOString(),
+          }).catch(() => {});
+
+          if (clienteSelecionado?.id) {
+            await axios.post('/api/documentos', {
+              entityId: clienteSelecionado.id,
+              entityType: 'cliente',
+              base64: reciboImagem,
+              filename: reciboPDF.replace('.pdf', '.jpg'),
+              anotacao: `Recibo da venda de carro ${vendaCriada.id} • Valor pago: ${formatCurrency(sanitizeNumber(Number(formData.valorPago), { min: 0, max: valorTotal }))}`,
+              dataUpload: new Date().toISOString(),
+              categoria: 'recibo_venda_carro',
+              referenciaId: String(vendaCriada.id),
+              referenciaTipo: 'venda_carro',
+              arquivoOriginal: reciboPDF,
+            }).catch(() => {});
+          }
+        } catch (pdfError) {
+          console.error('Erro ao gerar recibo da venda de carro:', pdfError);
+        }
+
         setSnackbar({
           open: true,
-          message: 'Venda de carro adicionada com sucesso',
+          message: 'Venda de carro adicionada com sucesso e recibo PDF gerado',
           severity: 'success'
         });
       }
@@ -557,6 +636,19 @@ const VendasCarros = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
+                name="valorPago"
+                label="Valor Pago"
+                type="number"
+                fullWidth
+                variant="outlined"
+                value={formData.valorPago}
+                onChange={handleInputChange}
+                inputProps={{ min: 0 }}
+                helperText="Esse valor será impresso no recibo PDF da venda."
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
                 name="fabricante"
                 label="Fabricante"
                 type="text"
@@ -629,6 +721,7 @@ const VendasCarros = () => {
               <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="body2" color="text.secondary">Resumo financeiro</Typography>
                 <Typography variant="body1">Valor Total: <strong>{formatCurrency(valorTotal)}</strong></Typography>
+                <Typography variant="body1">Valor Pago: <strong>{formatCurrency(Number(formData.valorPago) || 0)}</strong></Typography>
                 <Typography variant="body1">
                   Valor por Parcela: <strong>{formatCurrency(valorParcela)}</strong>
                   {numParcelas > 1 && ` (${numParcelas}x)`}

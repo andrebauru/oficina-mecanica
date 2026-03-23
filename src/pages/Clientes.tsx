@@ -29,6 +29,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import DocumentosDialog from '../components/DocumentosDialog';
+import { useLanguage } from '../components/LanguageContext';
 
 interface Cliente {
   id: string;
@@ -53,6 +54,7 @@ const clienteVazio: ClienteFormData = {
 };
 
 const Clientes = () => {
+  const { t } = useLanguage();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientesFiltrados, setClientesFiltrados] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -243,21 +245,21 @@ const Clientes = () => {
         mb: 3,
       }}>
         <Typography variant="h4" gutterBottom sx={{ m: 0 }}>
-          Clientes
+          {t('clientes_titulo')}
         </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenForm()}
         >
-          Novo Cliente
+          {t('novoCliente')}
         </Button>
       </Box>
 
       <TextField
         fullWidth
         variant="outlined"
-        placeholder="Buscar clientes..."
+        placeholder={`${t('buscarPlaceholder')} ${t('clientes_titulo').toLowerCase()}`}
         value={filtro}
         onChange={handleFiltroChange}
         InputProps={{
@@ -285,7 +287,7 @@ const Clientes = () => {
                     direction={ordenacao.campo === 'nome' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('nome')}
                   >
-                    Nome
+                    {t('nome')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -294,7 +296,7 @@ const Clientes = () => {
                     direction={ordenacao.campo === 'email' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('email')}
                   >
-                    Email
+                    {t('email')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -303,11 +305,11 @@ const Clientes = () => {
                     direction={ordenacao.campo === 'telefone' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('telefone')}
                   >
-                    Telefone
+                    {t('telefone')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell>Endereço</TableCell>
-                <TableCell align="center">Ações</TableCell>
+                <TableCell>{t('endereco')}</TableCell>
+                <TableCell align="center">{t('acao')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -322,7 +324,7 @@ const Clientes = () => {
                   <TableCell>{cliente.telefone}</TableCell>
                   <TableCell>{cliente.endereco}</TableCell>
                   <TableCell align="center">
-                    <IconButton onClick={(e) => { e.stopPropagation(); handleOpenDocs(cliente); }} color="secondary" title="Documentos / Fotos">
+                    <IconButton onClick={(e) => { e.stopPropagation(); handleOpenDocs(cliente); }} color="secondary" title={t('documentosFotos')}>
                       <PhotoLibraryIcon />
                     </IconButton>
                     <IconButton onClick={(e) => { e.stopPropagation(); handleOpenForm(cliente); }} color="primary">
@@ -341,13 +343,13 @@ const Clientes = () => {
 
       {/* Formulário de Cliente */}
       <Dialog open={openForm} onClose={handleCloseForm} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
+        <DialogTitle>{editingId ? `${t('editar')} ${t('cliente')}` : t('novoCliente')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
             name="nome"
-            label="Nome do Cliente"
+            label={t('nome')}
             type="text"
             fullWidth
             variant="outlined"
@@ -358,7 +360,7 @@ const Clientes = () => {
           <TextField
             margin="dense"
             name="email"
-            label="Email"
+            label={t('email')}
             type="email"
             fullWidth
             variant="outlined"
@@ -369,7 +371,7 @@ const Clientes = () => {
           <TextField
             margin="dense"
             name="telefone"
-            label="Telefone"
+            label={t('telefone')}
             type="tel"
             fullWidth
             variant="outlined"
@@ -380,7 +382,7 @@ const Clientes = () => {
           <TextField
             margin="dense"
             name="endereco"
-            label="Endereço"
+            label={t('endereco')}
             type="text"
             fullWidth
             multiline
@@ -392,28 +394,28 @@ const Clientes = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseForm} color="inherit">
-            Cancelar
+            {t('cancelar')}
           </Button>
           <Button onClick={handleSubmit} color="primary" variant="contained">
-            Salvar
+            {t('salvar')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Diálogo de Confirmação de Exclusão */}
       <Dialog open={openDelete} onClose={handleCloseDelete}>
-        <DialogTitle>Confirmar Exclusão</DialogTitle>
+        <DialogTitle>{t('confirmarDelecao')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.
+            {t('confirmarDelecao')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDelete} color="inherit">
-            Cancelar
+            {t('cancelar')}
           </Button>
           <Button onClick={handleDelete} color="error" variant="contained">
-            Excluir
+            {t('deletar')}
           </Button>
         </DialogActions>
       </Dialog>

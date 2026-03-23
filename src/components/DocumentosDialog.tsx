@@ -12,6 +12,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import { useLanguage } from './LanguageContext';
 
 interface Documento {
   id: string;
@@ -55,6 +56,7 @@ const resizeImage = (file: File, maxWidth = 1200, quality = 0.85): Promise<strin
   });
 
 const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: Props) => {
+  const { t } = useLanguage();
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -78,11 +80,11 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
       docs.forEach(d => { map[d.id] = d.anotacao; });
       setAnotacoes(map);
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao carregar documentos', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroCarregarDocumentos'), severity: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [entityId, entityType]);
+  }, [entityId, entityType, t]);
 
   useEffect(() => {
     if (open) fetchDocs();
@@ -105,9 +107,9 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
         });
       }
       await fetchDocs();
-      setSnackbar({ open: true, message: `${files.length} imagem(ns) adicionada(s)`, severity: 'success' });
+      setSnackbar({ open: true, message: `${files.length} ${t('uploadSucesso')}`, severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao fazer upload', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroUpload'), severity: 'error' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -119,9 +121,9 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
       const novaAnotacao = anotacoes[doc.id] ?? '';
       await axios.put(`/api/documentos/${doc.id}`, { ...doc, anotacao: novaAnotacao });
       setDocumentos(prev => prev.map(d => d.id === doc.id ? { ...d, anotacao: novaAnotacao } : d));
-      setSnackbar({ open: true, message: 'Anotação salva', severity: 'success' });
+      setSnackbar({ open: true, message: t('anotacaoSalva'), severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao salvar anotação', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroSalvarAnotacao'), severity: 'error' });
     }
   };
 
@@ -129,9 +131,9 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
     try {
       await axios.delete(`/api/documentos/${id}`);
       setDocumentos(prev => prev.filter(d => d.id !== id));
-      setSnackbar({ open: true, message: 'Documento excluído', severity: 'success' });
+      setSnackbar({ open: true, message: t('documentoExcluido'), severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao excluir documento', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroExcluirDocumento'), severity: 'error' });
     }
   };
 
@@ -139,7 +141,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
     <>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-          <Typography variant="h6">Documentos — {entityNome}</Typography>
+          <Typography variant="h6">{t('documentosTitulo')} — {entityNome}</Typography>
           <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
         </DialogTitle>
 
@@ -166,14 +168,14 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
             {uploading ? (
               <>
                 <CircularProgress size={32} />
-                <Typography variant="body2" color="text.secondary">Processando imagens...</Typography>
+                <Typography variant="body2" color="text.secondary">{t('processandoImagens')}</Typography>
               </>
             ) : (
               <>
                 <AddPhotoAlternateIcon color="primary" sx={{ fontSize: 44 }} />
-                <Typography variant="body1" fontWeight={600}>Clique para adicionar fotos</Typography>
+                <Typography variant="body1" fontWeight={600}>{t('cliqueAdicionarFotos')}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Múltiplas imagens suportadas · JPG, PNG, WEBP, HEIC
+                  {t('multiplasImagens')}
                 </Typography>
               </>
             )}
@@ -195,7 +197,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
             </Box>
           ) : documentos.length === 0 ? (
             <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
-              Nenhum documento adicionado ainda.
+              {t('nenhumDocumento')}
             </Typography>
           ) : (
             <Grid container spacing={2}>
@@ -221,14 +223,14 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                         multiline
                         rows={2}
                         size="small"
-                        label="Anotação"
+                        label={t('anotacao')}
                         value={anotacoes[doc.id] ?? ''}
                         onChange={e => setAnotacoes(prev => ({ ...prev, [doc.id]: e.target.value }))}
-                        placeholder="Adicione uma anotação..."
+                        placeholder={`${t('anotacao')}...`}
                       />
                     </CardContent>
                     <CardActions sx={{ justifyContent: 'space-between', px: 1.5, pb: 1, pt: 0.5 }}>
-                      <Tooltip title="Salvar anotação">
+                      <Tooltip title={t('salvarAnotacao')}>
                         <span>
                           <IconButton
                             size="small"
@@ -241,7 +243,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                         </span>
                       </Tooltip>
                       <Box>
-                        <Tooltip title="Ampliar">
+                        <Tooltip title={t('ampliar')}>
                           <IconButton size="small" onClick={() => setLightbox(doc.base64)}>
                             <ZoomInIcon fontSize="small" />
                           </IconButton>
@@ -261,14 +263,14 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={onClose} color="inherit">Fechar</Button>
+          <Button onClick={onClose} color="inherit">{t('fechar')}</Button>
           <Button
             variant="contained"
             startIcon={<CloudUploadIcon />}
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
-            Adicionar Fotos
+            {t('adicionarFotos')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -282,7 +284,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
           {lightbox && (
             <img
               src={lightbox}
-              alt="Documento ampliado"
+              alt={t('ampliar')}
               style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain' }}
             />
           )}

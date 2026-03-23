@@ -11,6 +11,9 @@ import {
 } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
 import HirataLogo from '../assets/Hirata Logo.svg';
+import { useLanguage } from '../components/LanguageContext';
+import { hashPassword, needsPasswordUpgrade, verifyPassword } from '../utils/security';
+import { startSession } from '../utils/session';
 
 interface Configuracao {
   id: string;
@@ -33,20 +36,8 @@ interface LoginProps {
   onLogin: () => void;
 }
 
-// cyrb53 — fast, consistent, works in any browser context (no secure origin needed)
-function hashPassword(str: string): string {
-  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
-}
-
 const Login = ({ onLogin }: LoginProps) => {
+  const { t } = useLanguage();
   const [users, setUsers] = useState<UsuarioLogin[]>([]);
   const [config, setConfig] = useState<Configuracao | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,40 +63,48 @@ const Login = ({ onLogin }: LoginProps) => {
 
   const handleSubmit = async () => {
     setErro('');
-    if (!senha) { setErro('Digite a senha'); return; }
+    if (!senha) { setErro(t('digiteSenha')); return; }
 
     setSalvando(true);
     try {
-      const hash = hashPassword(senha);
-
       if (primeiroUso) {
-        if (!usuario.trim()) { setErro('Digite o nome'); setSalvando(false); return; }
-        if (senha !== confirmar) { setErro('Senhas não coincidem'); setSalvando(false); return; }
-        if (senha.length < 4) { setErro('Senha deve ter ao menos 4 caracteres'); setSalvando(false); return; }
+        if (!usuario.trim()) { setErro(t('digiteNome')); setSalvando(false); return; }
+        if (senha !== confirmar) { setErro(t('senhasNaoConferem')); setSalvando(false); return; }
+        if (senha.length < 4) { setErro(t('senhaMinima')); setSalvando(false); return; }
 
         await axios.post('/api/usuarios', {
           nome: usuario.trim(),
           email: '',
           idioma: 'pt',
-          senhaHash: hash
+          senhaHash: await hashPassword(senha)
         });
         if (config?.id) {
           await axios.put(`/api/configuracoes/${config.id}`, { ...config });
         }
-        sessionStorage.setItem('authenticated', 'true');
+        startSession();
         onLogin();
       } else {
-        if (!usuario.trim()) { setErro('Digite o nome de usuário'); setSalvando(false); return; }
-        const found = users.find(u => u.nome === usuario.trim() && u.senhaHash === hash);
+        if (!usuario.trim()) { setErro(t('digiteUsuario')); setSalvando(false); return; }
+        const found = users.find(u => u.nome === usuario.trim());
         if (found) {
-          sessionStorage.setItem('authenticated', 'true');
+          const senhaValida = await verifyPassword(senha, found.senhaHash);
+          if (!senhaValida) {
+            setErro(t('usuarioSenhaInvalidos'));
+            return;
+          }
+
+          if (needsPasswordUpgrade(found.senhaHash)) {
+            await axios.patch(`/api/usuarios/${found.id}`, { senhaHash: await hashPassword(senha) }).catch(() => {});
+          }
+
+          startSession();
           onLogin();
         } else {
-          setErro('Usuário ou senha incorretos');
+          setErro(t('usuarioSenhaInvalidos'));
         }
       }
     } catch {
-      setErro('Erro ao processar. Verifique se o servidor está rodando.');
+      setErro(t('erroServidorLogin'));
     } finally {
       setSalvando(false);
     }
@@ -129,17 +128,17 @@ const Login = ({ onLogin }: LoginProps) => {
         <img src={HirataLogo} alt="Logo" style={{ height: 140, marginBottom: 24 }} />
         <Typography variant="h5" fontWeight="bold" mb={1} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
           <LockIcon />
-          {primeiroUso ? 'Definir Acesso' : 'Acesso ao Sistema'}
+          {primeiroUso ? t('definirAcesso') : t('acessoSistema')}
         </Typography>
         {primeiroUso && (
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Primeiro acesso — crie o primeiro usuário para proteger o sistema.
+            {t('primeiroAcessoTexto')}
           </Typography>
         )}
         {erro && <Alert severity="error" sx={{ mb: 2, textAlign: 'left' }}>{erro}</Alert>}
         <TextField
           fullWidth
-          label={primeiroUso ? "Nome" : "Usuário"}
+          label={primeiroUso ? t('nome') : t('usuario')}
           type="text"
           value={usuario}
           onChange={e => setUsuario(e.target.value)}
@@ -149,7 +148,7 @@ const Login = ({ onLogin }: LoginProps) => {
         />
         <TextField
           fullWidth
-          label="Senha"
+          label={t('senha')}
           type="password"
           value={senha}
           onChange={e => setSenha(e.target.value)}
@@ -159,7 +158,7 @@ const Login = ({ onLogin }: LoginProps) => {
         {primeiroUso && (
           <TextField
             fullWidth
-            label="Confirmar Senha"
+            label={t('confirmarSenha')}
             type="password"
             value={confirmar}
             onChange={e => setConfirmar(e.target.value)}
@@ -175,7 +174,7 @@ const Login = ({ onLogin }: LoginProps) => {
           disabled={salvando}
           startIcon={salvando ? <CircularProgress size={18} color="inherit" /> : <LockIcon />}
         >
-          {primeiroUso ? 'Criar Acesso' : 'Entrar'}
+          {primeiroUso ? t('criarAcesso') : t('entrar')}
         </Button>
       </Paper>
     </Box>

@@ -231,18 +231,32 @@
     {
       "id": "1",
       "valor": 1200000,
+      "valorPago": 450000,
       "fabricante": "Toyota",
       "modelo": "Corolla",
       "ano": 2022,
-      "kilometragem": 25000
+      "kilometragem": 25000,
+      "clienteId": "1",
+      "clienteNome": "João Silva",
+      "clienteTelefone": "(11) 98765-4321",
+      "clienteEndereco": "Rua das Flores, 123 - São Paulo, SP",
+      "reciboPDF": "recibo_venda_1_joao_silva_2026-03-23.pdf",
+      "reciboGeradoEm": "2026-03-23T09:15:00.000Z"
     },
     {
       "id": "2",
       "valor": 850000,
+      "valorPago": 850000,
       "fabricante": "Honda",
       "modelo": "Civic",
       "ano": 2020,
       "kilometragem": 40000,
+      "clienteId": "2",
+      "clienteNome": "Maria Oliveira",
+      "clienteTelefone": "(11) 91234-5678",
+      "clienteEndereco": "Avenida Paulista, 1000 - São Paulo, SP",
+      "reciboPDF": "recibo_venda_2_maria_oliveira_2026-03-23.pdf",
+      "reciboGeradoEm": "2026-03-23T09:20:00.000Z",
       "parcelasStatus": [
         true
       ]
@@ -253,9 +267,9 @@
       "id": "4284",
       "senhaHash": "0fae2419705676",
       "nomeEmpresa": "Hirata Cars",
-      "endereco": "Mie Ken Iga-Shi",
-      "telefone": "",
-      "numeroAutorizacao": ""
+      "endereco": "Mie Ken Iga-Shi, Oficina Central",
+      "telefone": "+81 59-0000-0000",
+      "numeroAutorizacao": "HC-2026-001"
     }
   ],
   "financeiro": [
@@ -528,7 +542,21 @@
       "tipo": "Saída"
     }
   ],
-  "documentos": [],
+  "documentos": [
+    {
+      "id": "doc-recibo-v001",
+      "entityId": "1",
+      "entityType": "cliente",
+      "base64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jG1sAAAAASUVORK5CYII=",
+      "filename": "recibo_venda_v001_joao_silva_2026-03-23.jpg",
+      "anotacao": "Recibo da venda v001 • Valor pago: ¥100,958",
+      "dataUpload": "2026-03-23T09:30:00.000Z",
+      "categoria": "recibo_venda",
+      "referenciaId": "v001",
+      "referenciaTipo": "venda",
+      "arquivoOriginal": "recibo_venda_v001_joao_silva_2026-03-23.pdf"
+    }
+  ],
   "usuarios": [
     {
       "nome": "Admin",
@@ -550,14 +578,20 @@
       "id": "v001",
       "clienteId": "1",
       "veiculoId": "2",
+      "clienteNomeSnapshot": "João Silva",
+      "clienteTelefoneSnapshot": "(11) 98765-4321",
+      "clienteEnderecoSnapshot": "Rua das Flores, 123 - São Paulo, SP",
       "dataVenda": "2026-02-15T10:30:00.000Z",
       "valorTotal": 1200000,
+      "valorPago": 100958.33,
       "tipoVenda": "parcelado",
       "numeroParcelas": 12,
       "juros": 14.6,
       "statusVenda": "ativo",
       "foroPagamento": "Tsu",
       "nomeContrato": "contrato_vi_v001_joo_silva_2026-03-07.pdf",
+      "reciboPDF": "recibo_venda_v001_joao_silva_2026-03-23.pdf",
+      "reciboGeradoEm": "2026-03-23T09:30:00.000Z",
       "placa": "DEF-5678",
       "chassi": "12345ABC67890DEF"
     },
@@ -565,14 +599,20 @@
       "id": "v002",
       "clienteId": "2",
       "veiculoId": "3",
+      "clienteNomeSnapshot": "Maria Oliveira",
+      "clienteTelefoneSnapshot": "(11) 91234-5678",
+      "clienteEnderecoSnapshot": "Avenida Paulista, 1000 - São Paulo, SP",
       "dataVenda": "2026-01-20T14:15:00.000Z",
       "valorTotal": 850000,
+      "valorPago": 850000,
       "tipoVenda": "vista",
       "numeroParcelas": 1,
       "juros": 0,
       "statusVenda": "quitado",
       "foroPagamento": "Tsu",
       "nomeContrato": "contrato_ja_v002_maria_oliveira_2026-03-06.pdf",
+      "reciboPDF": "recibo_venda_v002_maria_oliveira_2026-03-23.pdf",
+      "reciboGeradoEm": "2026-03-23T09:35:00.000Z",
       "placa": "GHI-9012",
       "chassi": "98765XYZ54321GHI"
     },
@@ -580,13 +620,19 @@
       "id": "v1772756331922",
       "clienteId": "1",
       "veiculoId": "2",
+      "clienteNomeSnapshot": "João Silva",
+      "clienteTelefoneSnapshot": "(11) 98765-4321",
+      "clienteEnderecoSnapshot": "Rua das Flores, 123 - São Paulo, SP",
       "dataVenda": "2026-03-06T00:18:51.922Z",
       "valorTotal": 1000000,
+      "valorPago": 1000000,
       "tipoVenda": "vista",
       "numeroParcelas": 1,
       "juros": 14.6,
       "statusVenda": "quitado",
       "foroPagamento": "Tsu",
+      "reciboPDF": "recibo_venda_v1772756331922_joao_silva_2026-03-23.pdf",
+      "reciboGeradoEm": "2026-03-23T09:40:00.000Z",
       "placa": "DEF-5678",
       "chassi": ""
     }

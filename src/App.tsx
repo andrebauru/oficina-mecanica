@@ -18,6 +18,7 @@ import Configuracoes from './pages/Configuracoes';
 import Usuarios from './pages/Usuarios';
 import VendasGestao from './pages/VendasGestao';
 import Login from './pages/Login';
+import { clearSession, isSessionAuthenticated, touchSession } from './utils/session';
 import './App.css'
 
 const theme = createTheme(
@@ -56,10 +57,31 @@ function App() {
   );
 
   useEffect(() => {
-    const auth = sessionStorage.getItem('authenticated');
-    setAuthenticated(auth === 'true');
+    setAuthenticated(isSessionAuthenticated());
     setChecking(false);
   }, []);
+
+  useEffect(() => {
+    if (!authenticated) return;
+
+    const updateActivity = () => touchSession();
+    const events: Array<keyof WindowEventMap> = ['click', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+
+    events.forEach(eventName => window.addEventListener(eventName, updateActivity, { passive: true }));
+    const interval = window.setInterval(() => {
+      if (!isSessionAuthenticated()) {
+        clearSession();
+        setAuthenticated(false);
+      }
+    }, 60_000);
+
+    touchSession();
+
+    return () => {
+      events.forEach(eventName => window.removeEventListener(eventName, updateActivity));
+      window.clearInterval(interval);
+    };
+  }, [authenticated]);
 
   const handleToggleSidebar = () => {
     setSidebarExpanded(prev => {
@@ -69,56 +91,47 @@ function App() {
     });
   };
 
-  if (checking) return null;
-
-  if (!authenticated) {
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Login onLogin={() => setAuthenticated(true)} />
-      </ThemeProvider>
-    );
-  }
-
-  const sidebarW = sidebarExpanded ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED;
-
   return (
     <LanguageProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Router>
-          <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-            <Navbar expanded={sidebarExpanded} onToggle={handleToggleSidebar} />
-            <Box
-              component="main"
-              sx={{
-                flexGrow: 1,
-                minWidth: 0,
-                ml: { xs: 0, md: `${sidebarW}px` },
-                mt: { xs: '64px', md: 0 },
-                transition: 'margin-left 0.25s ease',
-                p: { xs: 2, md: 3 },
-                maxWidth: '100%',
-              }}
-            >
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/veiculos" element={<Veiculos />} />
-                <Route path="/servicos" element={<Servicos />} />
-                <Route path="/pecas" element={<Pecas />} />
-                <Route path="/ordens" element={<OrdensServico />} />
-                <Route path="/vendas-carros" element={<VendasCarros />} />
-                <Route path="/vendas-gestao" element={<VendasGestao />} />
-                <Route path="/financeiro" element={<Financeiro />} />
-                <Route path="/relatorios" element={<Relatorios />} />
-                <Route path="/gerar-relatorio" element={<GerarRelatorio />} />
-                <Route path="/configuracoes" element={<Configuracoes />} />
-                <Route path="/usuarios" element={<Usuarios />} />
-              </Routes>
+        {checking ? null : !authenticated ? (
+          <Login onLogin={() => setAuthenticated(true)} />
+        ) : (
+          <Router>
+            <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+              <Navbar expanded={sidebarExpanded} onToggle={handleToggleSidebar} />
+              <Box
+                component="main"
+                sx={{
+                  flexGrow: 1,
+                  minWidth: 0,
+                  ml: { xs: 0, md: `${sidebarExpanded ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED}px` },
+                  mt: { xs: '64px', md: 0 },
+                  transition: 'margin-left 0.25s ease',
+                  p: { xs: 2, md: 3 },
+                  maxWidth: '100%',
+                }}
+              >
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/clientes" element={<Clientes />} />
+                  <Route path="/veiculos" element={<Veiculos />} />
+                  <Route path="/servicos" element={<Servicos />} />
+                  <Route path="/pecas" element={<Pecas />} />
+                  <Route path="/ordens" element={<OrdensServico />} />
+                  <Route path="/vendas-carros" element={<VendasCarros />} />
+                  <Route path="/vendas-gestao" element={<VendasGestao />} />
+                  <Route path="/financeiro" element={<Financeiro />} />
+                  <Route path="/relatorios" element={<Relatorios />} />
+                  <Route path="/gerar-relatorio" element={<GerarRelatorio />} />
+                  <Route path="/configuracoes" element={<Configuracoes />} />
+                  <Route path="/usuarios" element={<Usuarios />} />
+                </Routes>
+              </Box>
             </Box>
-          </Box>
-        </Router>
+          </Router>
+        )}
       </ThemeProvider>
     </LanguageProvider>
   );

@@ -11,7 +11,7 @@ export interface Cliente {
   email: string;
   telefone: string;
   endereco: string;
-  idioma?: 'pt' | 'fil';
+  idioma?: 'pt' | 'fil' | 'vi';
 }
 
 export interface Veiculo {
@@ -34,8 +34,12 @@ export interface Venda {
   id: string;
   clienteId: string;
   veiculoId: string;
+  clienteNomeSnapshot?: string;
+  clienteTelefoneSnapshot?: string;
+  clienteEnderecoSnapshot?: string;
   dataVenda: string; // ISO date
   valorTotal: number;
+  valorPago?: number;
   tipoVenda: TipoVenda;
   numeroParcelas: number;
   juros: number; // percentual
@@ -46,6 +50,7 @@ export interface Venda {
   chassi: string;
   dataQuitar?: string; // data de quitação (apenas para 'quitado')
   reciboPDF?: string; // nome do arquivo de recibo
+  reciboGeradoEm?: string;
   observacoes?: string;
 }
 

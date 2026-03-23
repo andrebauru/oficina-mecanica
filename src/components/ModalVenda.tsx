@@ -28,14 +28,24 @@ import { Plus } from 'lucide-react';
 import axios from 'axios';
 import { Cliente, Veiculo, Venda, Parcela } from '../types/vendas';
 import Paper from '@mui/material/Paper';
+import HirataLogo from '../assets/Hirata Logo.svg';
 import {
   calcularParcelamento,
   calcularVendaVista,
   formatarMoeda,
   formatarDataBR
 } from '../utils/vendas';
+import { baixarReciboVendaPDF, gerarReciboVendaImagem, gerarReciboVendaPDF } from '../utils/gerarReciboVendaPDF';
+import { sanitizeMultilineText, sanitizeNumber, sanitizeText } from '../utils/security';
 
 const API_URL = '/api';
+
+interface Configuracao {
+  nomeEmpresa?: string;
+  endereco?: string;
+  telefone?: string;
+  numeroAutorizacao?: string;
+}
 
 interface ModalVendaProps {
   open?: boolean;
@@ -64,6 +74,7 @@ interface DadosVenda {
   tipoVenda: 'vista' | 'parcelado';
   numeroParcelas: number;
   valorTotal: number;
+  valorPago: number;
   juros: number;
   servicosIds: string[];
   pecasIds: string[];
@@ -83,6 +94,7 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
   const [carregando, setCarregando] = useState(true);
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [config, setConfig] = useState<Configuracao>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dadosCliente, setDadosCliente] = useState<any>(null);
 
@@ -93,6 +105,7 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
     tipoVenda: 'parcelado',
     numeroParcelas: 12,
     valorTotal: 1000000,
+    valorPago: 0,
     juros: 14.6,
     servicosIds: [],
     pecasIds: [],
@@ -112,17 +125,19 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
       setCarregando(true);
       setErro(null);
 
-      const [clientesRes, veiculosRes, servicosRes, pecasRes] = await Promise.all([
+      const [clientesRes, veiculosRes, servicosRes, pecasRes, configRes] = await Promise.all([
         axios.get(`${API_URL}/clientes`),
         axios.get(`${API_URL}/veiculos`),
         axios.get(`${API_URL}/servicos`),
-        axios.get(`${API_URL}/pecas`)
+        axios.get(`${API_URL}/pecas`),
+        axios.get(`${API_URL}/configuracoes`).catch(() => ({ data: [] }))
       ]);
 
       setClientes(clientesRes.data);
       setVeiculos(veiculosRes.data);
       setServicos(servicosRes.data);
       setPecas(pecasRes.data);
+      setConfig(configRes.data?.[0] || {});
     } catch (err) {
       const mensagem = err instanceof Error ? err.message : 'Erro ao carregar dados';
       setErro(mensagem);
@@ -147,6 +162,23 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
     }
   }, [dadosVenda]);
 
+  useEffect(() => {
+    if (dadosVenda.tipoVenda === 'vista') {
+      setDadosVenda(prev => {
+        if (prev.numeroParcelas === 1 && prev.juros === 0 && prev.valorPago === prev.valorTotal) return prev;
+        return { ...prev, numeroParcelas: 1, juros: 0, valorPago: prev.valorTotal };
+      });
+      return;
+    }
+
+    setDadosVenda(prev => {
+      if (prev.juros === 0) {
+        return { ...prev, juros: 14.6 };
+      }
+      return prev;
+    });
+  }, [dadosVenda.tipoVenda]);
+
   // Atualizar dados do cliente quando clienteId muda
   useEffect(() => {
     if (dadosVenda.clienteId) {
@@ -169,6 +201,10 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
     }
     if (dadosVenda.valorTotal <= 0) {
       setErro('Valor total deve ser maior que zero');
+      return false;
+    }
+    if (dadosVenda.valorPago < 0) {
+      setErro('Valor pago não pode ser negativo');
       return false;
     }
     if (dadosVenda.tipoVenda === 'parcelado' && dadosVenda.numeroParcelas <= 0) {
@@ -208,14 +244,20 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
         return sum + (p?.preco || 0);
       }, 0);
       const valorTotalComItens = dadosVenda.valorTotal + valorServicos + valorPecas;
+      const valorPago = sanitizeNumber(dadosVenda.valorPago, { min: 0, max: valorTotalComItens });
+      const observacoes = sanitizeMultilineText(dadosVenda.observacoes || '', 500);
 
       // Criar venda
       const novaVenda: Venda = {
         id: vendaId,
         clienteId: dadosVenda.clienteId,
         veiculoId: dadosVenda.veiculoId,
+        clienteNomeSnapshot: sanitizeText(cliente.nome, 100),
+        clienteTelefoneSnapshot: sanitizeText(cliente.telefone || '', 40),
+        clienteEnderecoSnapshot: sanitizeMultilineText(cliente.endereco || '', 250),
         dataVenda: new Date().toISOString(),
         valorTotal: valorTotalComItens,
+        valorPago,
         tipoVenda: dadosVenda.tipoVenda,
         numeroParcelas: dadosVenda.numeroParcelas,
         juros: dadosVenda.juros,
@@ -223,7 +265,7 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
         foroPagamento: 'Tsu',
         placa: veiculo.placa,
         chassi: veiculo.chassi || '',
-        observacoes: dadosVenda.observacoes || ''
+        observacoes
       };
 
       // Calcular parcelas
@@ -258,6 +300,52 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
       // Salvar parcelas
       for (const parcela of parcelas) {
         await axios.post(`${API_URL}/parcelas`, parcela);
+      }
+
+      try {
+        const reciboDados = {
+          logoUrl: HirataLogo,
+          nomeEmpresa: config.nomeEmpresa,
+          enderecoEmpresa: config.endereco,
+          telefoneEmpresa: config.telefone,
+          numeroAutorizacao: config.numeroAutorizacao,
+          clienteNome: cliente.nome,
+          clienteTelefone: cliente.telefone,
+          clienteEndereco: cliente.endereco,
+          numeroVenda: vendaId,
+          dataVenda: novaVenda.dataVenda,
+          descricaoVeiculo: `${veiculo.marca} ${veiculo.modelo} (${veiculo.placa})`,
+          placa: veiculo.placa,
+          chassi: veiculo.chassi,
+          tipoVenda: dadosVenda.tipoVenda,
+          valorTotal: valorTotalComItens,
+          valorPago,
+          observacoes,
+        };
+
+        const reciboBlob = await gerarReciboVendaPDF(reciboDados);
+        const reciboImagem = await gerarReciboVendaImagem(reciboDados);
+
+        const reciboPDF = baixarReciboVendaPDF(reciboBlob, vendaId, cliente.nome);
+        await axios.patch(`${API_URL}/vendas/${vendaId}`, {
+          reciboPDF,
+          reciboGeradoEm: new Date().toISOString(),
+        }).catch(() => {});
+
+        await axios.post('/api/documentos', {
+          entityId: cliente.id,
+          entityType: 'cliente',
+          base64: reciboImagem,
+          filename: reciboPDF.replace('.pdf', '.jpg'),
+          anotacao: `Recibo da venda ${vendaId} • Valor pago: ${formatarMoeda(valorPago)}`,
+          dataUpload: new Date().toISOString(),
+          categoria: 'recibo_venda',
+          referenciaId: vendaId,
+          referenciaTipo: 'venda',
+          arquivoOriginal: reciboPDF,
+        }).catch(() => {});
+      } catch (pdfError) {
+        console.error('Erro ao gerar recibo da venda:', pdfError);
       }
 
       onVendaCriada();
@@ -442,6 +530,22 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
                   />
                 </Grid>
 
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Valor Pago no ato"
+                    type="number"
+                    value={dadosVenda.valorPago}
+                    onChange={(e) => setDadosVenda({
+                      ...dadosVenda,
+                      valorPago: parseFloat(e.target.value || '0')
+                    })}
+                    disabled={criando}
+                    inputProps={{ step: '1000', min: '0' }}
+                    helperText="Esse valor será exibido no recibo PDF gerado automaticamente."
+                  />
+                </Grid>
+
                 {dadosVenda.tipoVenda === 'parcelado' && (
                   <>
                     <Grid item xs={12} sm={6}>
@@ -587,16 +691,18 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
                   <Grid item xs={6} sm={3}>
                     <Box>
                       <Typography variant="caption" color="textSecondary">
-                        Por Parcela
+                        Valor Pago
                       </Typography>
                       <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                        {formatarMoeda(
-                          resultadoCalc.valorTotalComJuros / previewParcelas.length
-                        )}
+                        {formatarMoeda(dadosVenda.valorPago)}
                       </Typography>
                     </Box>
                   </Grid>
                 </Grid>
+
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Ao salvar, o sistema gera um recibo PDF com logo, dados da empresa, dados do cliente, valor pago e espaço para carimbo/calibração.
+                </Alert>
 
                 {/* Tabela de parcelas */}
                 {previewParcelas.length > 0 && (

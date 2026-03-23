@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { formatCurrency } from '../utils/formatters';
+import { useLanguage } from '../components/LanguageContext';
 
 interface Cliente {
   id: string;
@@ -43,6 +44,7 @@ interface VendaCarro {
 }
 
 const Dashboard = () => {
+  const { t } = useLanguage();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([]);
@@ -127,22 +129,22 @@ const Dashboard = () => {
     .slice(0, 5);
 
   if (loading) {
-    return <Typography>Carregando...</Typography>;
+    return <Typography>{t('carregar')}</Typography>;
   }
 
   const getVeiculoInfo = (veiculoId: string) => {
     const veiculo = veiculos.find(v => v.id === veiculoId);
-    if (!veiculo) return 'Veículo não encontrado';
+    if (!veiculo) return t('veiculoNaoEncontrado');
     return `${veiculo.marca} ${veiculo.modelo} (${veiculo.placa})`;
   };
 
   const statCards = [
-    { label: 'Clientes', value: totalClientes, icon: <PeopleIcon color="primary" sx={{ fontSize: 38 }} />, color: undefined },
-    { label: 'Veículos', value: totalVeiculos, icon: <DirectionsCarIcon color="primary" sx={{ fontSize: 38 }} />, color: undefined },
-    { label: 'OS em Andamento', value: ordensEmAndamento, icon: <BuildIcon color="warning" sx={{ fontSize: 38 }} />, color: undefined },
-    { label: 'Faturamento Total (OS)', value: formatCurrency(faturamentoTotal), icon: <AttachMoneyIcon color="success" sx={{ fontSize: 38 }} />, color: undefined },
-    { label: 'A Receber', value: formatCurrency(totalAReceber), icon: <AttachMoneyIcon sx={{ fontSize: 38, color: '#d32f2f' }} />, color: '#ffebee' },
-    { label: 'Já Recebido', value: formatCurrency(totalJaRecebido), icon: <AttachMoneyIcon sx={{ fontSize: 38, color: '#2e7d32' }} />, color: '#e8f5e9' },
+    { label: t('totalClientes'), value: totalClientes, icon: <PeopleIcon color="primary" sx={{ fontSize: 38 }} />, color: undefined },
+    { label: t('totalVeiculos'), value: totalVeiculos, icon: <DirectionsCarIcon color="primary" sx={{ fontSize: 38 }} />, color: undefined },
+    { label: t('ordensEmAndamento'), value: ordensEmAndamento, icon: <BuildIcon color="warning" sx={{ fontSize: 38 }} />, color: undefined },
+    { label: `${t('faturamentoTotal')} (OS)`, value: formatCurrency(faturamentoTotal), icon: <AttachMoneyIcon color="success" sx={{ fontSize: 38 }} />, color: undefined },
+    { label: t('aReceber'), value: formatCurrency(totalAReceber), icon: <AttachMoneyIcon sx={{ fontSize: 38, color: '#d32f2f' }} />, color: '#ffebee' },
+    { label: t('jaRecebido'), value: formatCurrency(totalJaRecebido), icon: <AttachMoneyIcon sx={{ fontSize: 38, color: '#2e7d32' }} />, color: '#e8f5e9' },
   ];
 
   return (
@@ -165,7 +167,7 @@ const Dashboard = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Card elevation={3}>
-            <CardHeader title="Ordens de Serviço Recentes" />
+            <CardHeader title={t('ultimasOrdens')} />
             <CardContent sx={{ p: 0 }}>
               {ordensRecentes.length > 0 ? (
                 <List disablePadding>
@@ -177,15 +179,15 @@ const Dashboard = () => {
                           secondary={
                             <>
                               <Typography component="span" variant="body2" color="text.primary">
-                                Status: {ordem.status}
+                                {t('status')}: {ordem.status}
                               </Typography>
                               <br />
                               <Typography component="span" variant="body2">
-                                Data: {new Date(ordem.dataEntrada).toLocaleDateString('pt-BR')}
+                                {t('data')}: {new Date(ordem.dataEntrada).toLocaleDateString('pt-BR')}
                               </Typography>
                               <br />
                               <Typography component="span" variant="body2">
-                                Valor: {formatCurrency(ordem.valorTotal)}
+                                {t('valor')}: {formatCurrency(ordem.valorTotal)}
                               </Typography>
                             </>
                           }
@@ -196,7 +198,7 @@ const Dashboard = () => {
                   ))}
                 </List>
               ) : (
-                <Typography sx={{ p: 2 }}>Nenhuma ordem de serviço encontrada</Typography>
+                <Typography sx={{ p: 2 }}>{t('nenhumaOS')}</Typography>
               )}
             </CardContent>
           </Card>
@@ -204,7 +206,7 @@ const Dashboard = () => {
         <Grid item xs={12} md={6}>
           <Card elevation={3}>
             <CardHeader
-              title="Últimas Vendas de Carros"
+              title={t('ultimasVendas')}
               avatar={<DirectionsCarIcon color="primary" />}
             />
             <CardContent sx={{ p: 0 }}>
@@ -233,7 +235,7 @@ const Dashboard = () => {
                   ))}
                 </List>
               ) : (
-                <Typography sx={{ p: 2 }}>Nenhuma venda de carro cadastrada</Typography>
+                <Typography sx={{ p: 2 }}>{t('nenhumaVenda')}</Typography>
               )}
             </CardContent>
           </Card>

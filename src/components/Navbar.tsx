@@ -26,19 +26,19 @@ export const SIDEBAR_EXPANDED = 240;
 export const SIDEBAR_COLLAPSED = 64;
 
 const navItems = [
-  { text: 'Dashboard',          path: '/',                icon: <DashboardIcon /> },
-  { text: 'OS',                 path: '/ordens',          icon: <AssignmentIcon /> },
-  { text: 'Clientes',           path: '/clientes',        icon: <PeopleIcon /> },
-  { text: 'Veículos',           path: '/veiculos',        icon: <DirectionsCarIcon /> },
-  { text: 'Serviços',           path: '/servicos',        icon: <BuildIcon /> },
-  { text: 'Peças',              path: '/pecas',           icon: <BuildIcon /> },
-  { text: 'Vendas Carros',      path: '/vendas-carros',   icon: <MonetizationOnIcon /> },
-  { text: 'Gestão de Vendas',   path: '/vendas-gestao',   icon: <AccountBalanceWalletIcon /> },
-  { text: 'Financeiro',         path: '/financeiro',      icon: <AccountBalanceWalletIcon /> },
-  { text: 'Relatórios',         path: '/relatorios',      icon: <AssessmentIcon /> },
-  { text: 'Gerar Relatório PDF',path: '/gerar-relatorio', icon: <PictureAsPdfIcon /> },
-  { text: 'Usuários',           path: '/usuarios',        icon: <PeopleIcon /> },
-  { text: 'Configurações',      path: '/configuracoes',   icon: <SettingsIcon /> },
+  { key: 'dashboard',      path: '/',                icon: <DashboardIcon /> },
+  { key: 'os',             path: '/ordens',          icon: <AssignmentIcon /> },
+  { key: 'clientes',       path: '/clientes',        icon: <PeopleIcon /> },
+  { key: 'veiculos',       path: '/veiculos',        icon: <DirectionsCarIcon /> },
+  { key: 'servicos',       path: '/servicos',        icon: <BuildIcon /> },
+  { key: 'pecas',          path: '/pecas',           icon: <BuildIcon /> },
+  { key: 'vendasCarros',   path: '/vendas-carros',   icon: <MonetizationOnIcon /> },
+  { key: 'vendasGestao',   path: '/vendas-gestao',   icon: <AccountBalanceWalletIcon /> },
+  { key: 'financeiro',     path: '/financeiro',      icon: <AccountBalanceWalletIcon /> },
+  { key: 'relatorios',     path: '/relatorios',      icon: <AssessmentIcon /> },
+  { key: 'gerarRelatorio', path: '/gerar-relatorio', icon: <PictureAsPdfIcon /> },
+  { key: 'usuarios',       path: '/usuarios',        icon: <PeopleIcon /> },
+  { key: 'configuracoes',  path: '/configuracoes',   icon: <SettingsIcon /> },
 ];
 
 interface NavbarProps {
@@ -52,7 +52,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const location = useLocation();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
     axios.get('/api/configuracoes')
@@ -112,8 +112,9 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
       <List sx={{ flexGrow: 1, pt: 1, px: 0.5 }}>
         {navItems.map(item => {
           const isActive = location.pathname === item.path;
+          const itemText = t(item.key);
           const btn = (
-            <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+            <ListItem key={item.key} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 component={Link}
                 to={item.path}
@@ -139,7 +140,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText
-                  primary={item.text}
+                  primary={itemText}
                   primaryTypographyProps={{
                     fontSize: 13,
                     fontWeight: 700,
@@ -153,7 +154,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
           );
 
           return expanded ? btn : (
-            <Tooltip key={item.text} title={item.text} placement="right" arrow>
+            <Tooltip key={item.key} title={itemText} placement="right" arrow>
               {btn}
             </Tooltip>
           );
@@ -166,11 +167,11 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
           <>
             <Box sx={{ mb: 1 }}>
               <Typography variant="caption" sx={{ color: 'rgba(255,214,0,0.6)', display: 'block', mb: 0.5 }}>
-                Idioma
+                {t('idiomaLabel')}
               </Typography>
               <Select
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as 'pt' | 'fil')}
+                onChange={(e) => setLanguage(e.target.value as 'pt' | 'fil' | 'vi')}
                 size="small"
                 sx={{
                   width: '100%',
@@ -181,8 +182,9 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
                   '& .MuiOutlinedInput-input': { padding: '8px 12px', fontSize: '0.875rem' }
                 }}
               >
-                <MenuItem value="pt">Português</MenuItem>
-                <MenuItem value="fil">Filipino</MenuItem>
+                <MenuItem value="pt">{t('portugues')}</MenuItem>
+                <MenuItem value="fil">{t('filipino')}</MenuItem>
+                <MenuItem value="vi">{t('vietnamita')}</MenuItem>
               </Select>
             </Box>
             <Divider sx={{ borderColor: 'rgba(255,214,0,0.1)', mb: 1 }} />
@@ -209,7 +211,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
           </>
         )}
         {!expanded && (
-          <Tooltip title={`${nomeEmpresa || 'Oficina'} · v1.5 · andretsc.info`} placement="right" arrow>
+          <Tooltip title={`${nomeEmpresa || t('oficinaMecanica')} · v1.5 · andretsc.info`} placement="right" arrow>
             <Typography sx={{ color: 'rgba(255,214,0,0.4)', fontSize: 9, textAlign: 'center', cursor: 'default' }}>
               v1.5
             </Typography>
@@ -229,7 +231,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
               <MenuIcon />
             </IconButton>
             <img src={HirataLogo} alt="Logo" style={{ height: 36 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 16, color: '#FFD600' }}>Oficina Mecânica</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 16, color: '#FFD600' }}>{t('oficinaMecanica')}</Typography>
           </Toolbar>
         </AppBar>
       )}

@@ -17,6 +17,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import LockIcon from '@mui/icons-material/Lock';
+import { useLanguage } from '../components/LanguageContext';
+import { hashPassword, sanitizeMultilineText, sanitizeText, verifyPassword } from '../utils/security';
 
 interface Configuracao {
   id?: string;
@@ -27,20 +29,8 @@ interface Configuracao {
   numeroAutorizacao?: string;
 }
 
-// cyrb53 — fast, consistent, works in any browser context (no secure origin needed)
-function hashPassword(str: string): string {
-  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
-}
-
 const Configuracoes = () => {
+  const { t } = useLanguage();
   const [config, setConfig] = useState<Configuracao>({});
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -84,6 +74,10 @@ const Configuracoes = () => {
     setSalvandoInfo(true);
     try {
       const updated = { ...config, ...formData };
+      updated.nomeEmpresa = sanitizeText(updated.nomeEmpresa || '', 120);
+      updated.endereco = sanitizeMultilineText(updated.endereco || '', 250);
+      updated.telefone = sanitizeText(updated.telefone || '', 40);
+      updated.numeroAutorizacao = sanitizeText(updated.numeroAutorizacao || '', 60);
       if (config.id) {
         await axios.put(`/api/configuracoes/${config.id}`, updated);
         setConfig(updated);
@@ -91,9 +85,9 @@ const Configuracoes = () => {
         const res = await axios.post('/api/configuracoes', updated);
         setConfig(res.data);
       }
-      setSnackbar({ open: true, message: 'Informações da empresa salvas', severity: 'success' });
+      setSnackbar({ open: true, message: t('infoEmpresaSalvas'), severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao salvar informações', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroSalvarInfo'), severity: 'error' });
     } finally {
       setSalvandoInfo(false);
     }
@@ -102,26 +96,25 @@ const Configuracoes = () => {
   const handleChangeSenha = async () => {
     setSenhaErro('');
     if (!senhaAtual || !novaSenha || !confirmarSenha) {
-      setSenhaErro('Preencha todos os campos');
+      setSenhaErro(t('preencherTodosCampos'));
       return;
     }
     if (novaSenha !== confirmarSenha) {
-      setSenhaErro('Nova senha e confirmação não coincidem');
+      setSenhaErro(t('senhasNaoConferem'));
       return;
     }
     if (novaSenha.length < 4) {
-      setSenhaErro('Senha deve ter ao menos 4 caracteres');
+      setSenhaErro(t('senhaMinima'));
       return;
     }
 
     setSalvandoSenha(true);
     try {
-      const hashAtual = hashPassword(senhaAtual);
-      if (config.senhaHash && hashAtual !== config.senhaHash) {
-        setSenhaErro('Senha atual incorreta');
+      if (config.senhaHash && !(await verifyPassword(senhaAtual, config.senhaHash))) {
+        setSenhaErro(t('senhaAtualIncorreta'));
         return;
       }
-      const hashNova = hashPassword(novaSenha);
+      const hashNova = await hashPassword(novaSenha);
       const updated = { ...config, senhaHash: hashNova };
       if (config.id) {
         await axios.put(`/api/configuracoes/${config.id}`, updated);
@@ -133,9 +126,9 @@ const Configuracoes = () => {
       setSenhaAtual('');
       setNovaSenha('');
       setConfirmarSenha('');
-      setSnackbar({ open: true, message: 'Senha alterada com sucesso', severity: 'success' });
+      setSnackbar({ open: true, message: t('senhaAlterada'), severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao alterar senha', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroAlterarSenha'), severity: 'error' });
     } finally {
       setSalvandoSenha(false);
     }
@@ -160,9 +153,9 @@ const Configuracoes = () => {
       a.download = `backup-oficina-${date}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      setSnackbar({ open: true, message: 'Backup gerado com sucesso', severity: 'success' });
+      setSnackbar({ open: true, message: t('backupSucesso'), severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao gerar backup', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroBackup'), severity: 'error' });
     }
   };
 
@@ -178,7 +171,7 @@ const Configuracoes = () => {
     try {
       const text = await file.text();
       const db = JSON.parse(text);
-      const collections = Object.keys(db) as string[];
+      const collections = COLLECTIONS.filter(col => Array.isArray(db[col]));
 
       for (const col of collections) {
         const newItems: { id: string }[] = db[col];
@@ -193,9 +186,9 @@ const Configuracoes = () => {
           await axios.post(`/api/${col}`, item).catch(() => {});
         }
       }
-      setSnackbar({ open: true, message: 'Restauração concluída com sucesso — recarregue a página', severity: 'success' });
+      setSnackbar({ open: true, message: t('restauracaoSucesso'), severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao restaurar — arquivo inválido?', severity: 'error' });
+      setSnackbar({ open: true, message: t('erroRestauracao'), severity: 'error' });
     } finally {
       setRestaurando(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -212,20 +205,20 @@ const Configuracoes = () => {
 
   return (
     <Box sx={{ maxWidth: 700, mx: 'auto' }}>
-      <Typography variant="h4" fontWeight="bold" mb={3}>Configurações</Typography>
+      <Typography variant="h4" fontWeight="bold" mb={3}>{t('configuracoes_titulo')}</Typography>
 
       {/* Company Info */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h6" mb={2}>Informações da Empresa</Typography>
+          <Typography variant="h6" mb={2}>{t('infoEmpresa')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Estes dados aparecem no rodapé dos relatórios PDF gerados.
+            {t('dadosAparecemPdf')}
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Nome da Empresa"
+                label={t('nomeEmpresa')}
                 value={formData.nomeEmpresa}
                 onChange={e => setFormData(p => ({ ...p, nomeEmpresa: e.target.value }))}
               />
@@ -233,7 +226,7 @@ const Configuracoes = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Endereço"
+                label={t('endereco')}
                 value={formData.endereco}
                 onChange={e => setFormData(p => ({ ...p, endereco: e.target.value }))}
                 multiline
@@ -243,7 +236,7 @@ const Configuracoes = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Telefone"
+                label={t('telefone')}
                 value={formData.telefone}
                 onChange={e => setFormData(p => ({ ...p, telefone: e.target.value }))}
               />
@@ -251,7 +244,7 @@ const Configuracoes = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Número de Autorização Oficial"
+                label={t('numeroAutorizacao')}
                 value={formData.numeroAutorizacao}
                 onChange={e => setFormData(p => ({ ...p, numeroAutorizacao: e.target.value }))}
               />
@@ -263,7 +256,7 @@ const Configuracoes = () => {
                 onClick={handleSaveInfo}
                 disabled={salvandoInfo}
               >
-                Salvar Informações
+                {t('salvarInformacoes')}
               </Button>
             </Grid>
           </Grid>
@@ -274,14 +267,14 @@ const Configuracoes = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LockIcon /> Alterar Senha
+            <LockIcon /> {t('alterarSenha')}
           </Typography>
           {senhaErro && <Alert severity="error" sx={{ mb: 2 }}>{senhaErro}</Alert>}
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Senha Atual"
+                label={t('senhaAtual')}
                 type="password"
                 value={senhaAtual}
                 onChange={e => setSenhaAtual(e.target.value)}
@@ -290,7 +283,7 @@ const Configuracoes = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Nova Senha"
+                label={t('novaSenha')}
                 type="password"
                 value={novaSenha}
                 onChange={e => setNovaSenha(e.target.value)}
@@ -299,7 +292,7 @@ const Configuracoes = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Confirmar Nova Senha"
+                label={t('confirmarSenha')}
                 type="password"
                 value={confirmarSenha}
                 onChange={e => setConfirmarSenha(e.target.value)}
@@ -313,7 +306,7 @@ const Configuracoes = () => {
                 onClick={handleChangeSenha}
                 disabled={salvandoSenha}
               >
-                Alterar Senha
+                {t('alterarSenhaBtn')}
               </Button>
             </Grid>
           </Grid>
@@ -323,7 +316,7 @@ const Configuracoes = () => {
       {/* Backup / Restore */}
       <Card>
         <CardContent>
-          <Typography variant="h6" mb={1}>Backup e Restauração</Typography>
+          <Typography variant="h6" mb={1}>{t('backup')}</Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
             Faça download do banco de dados completo e restaure-o em caso de reinstalação do sistema.
           </Typography>
@@ -335,7 +328,7 @@ const Configuracoes = () => {
               startIcon={<DownloadIcon />}
               onClick={handleBackup}
             >
-              Backup (Download)
+              {t('backupDownload')}
             </Button>
             <Button
               variant="outlined"

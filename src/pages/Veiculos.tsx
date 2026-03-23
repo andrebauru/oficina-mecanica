@@ -34,6 +34,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import { SelectChangeEvent } from '@mui/material/Select';
 import DocumentosDialog from '../components/DocumentosDialog';
+import { useLanguage } from '../components/LanguageContext';
 
 interface Veiculo {
   id: string;
@@ -66,6 +67,7 @@ const veiculoVazio: VeiculoFormData = {
 };
 
 const Veiculos = () => {
+  const { t } = useLanguage();
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,7 +207,7 @@ const Veiculos = () => {
 
   const getClienteNome = useCallback((clienteId: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
-    return cliente ? cliente.nome : 'Cliente não encontrado';
+    return cliente ? cliente.nome : t('clienteNaoEncontrado');
   }, [clientes]);
 
   const [openDocs, setOpenDocs] = useState(false);
@@ -281,7 +283,7 @@ const Veiculos = () => {
     <Box sx={{ flexGrow: 1 }}>
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: 3 }}>
         <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }} gutterBottom>
-          Veículos
+          {t('veiculos_titulo')}
         </Typography>
         <Button
           variant="contained"
@@ -291,7 +293,7 @@ const Veiculos = () => {
           fullWidth={window.innerWidth < 600}
           sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          Novo Veículo
+          {t('novoVeiculo')}
         </Button>
       </Box>
 
@@ -299,7 +301,7 @@ const Veiculos = () => {
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Buscar veículos por marca, modelo, placa, ano ou cliente"
+          placeholder={`${t('buscarPlaceholder')} ${t('veiculos_titulo').toLowerCase()}`}
           value={filtro}
           onChange={handleFiltroChange}
           InputProps={{
@@ -328,7 +330,7 @@ const Veiculos = () => {
                     direction={ordenacao.campo === 'clienteId' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('clienteId')}
                   >
-                    Cliente
+                    {t('cliente')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -337,7 +339,7 @@ const Veiculos = () => {
                     direction={ordenacao.campo === 'marca' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('marca')}
                   >
-                    Marca
+                    {t('marca')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -346,7 +348,7 @@ const Veiculos = () => {
                     direction={ordenacao.campo === 'modelo' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('modelo')}
                   >
-                    Modelo
+                    {t('modelo')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -355,7 +357,7 @@ const Veiculos = () => {
                     direction={ordenacao.campo === 'ano' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('ano')}
                   >
-                    Ano
+                    {t('ano')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>
@@ -364,10 +366,10 @@ const Veiculos = () => {
                     direction={ordenacao.campo === 'placa' ? ordenacao.direcao : 'asc'}
                     onClick={() => handleOrdenacaoChange('placa')}
                   >
-                    Placa
+                    {t('placa')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="center">Ações</TableCell>
+                <TableCell align="center">{t('acao')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -389,7 +391,7 @@ const Veiculos = () => {
                         color="secondary"
                         onClick={(e) => { e.stopPropagation(); handleOpenDocs(veiculo); }}
                         size="small"
-                        title="Documentos / Fotos"
+                        title={t('documentosFotos')}
                       >
                         <PhotoLibraryIcon />
                       </IconButton>
@@ -413,7 +415,7 @@ const Veiculos = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
-                    Nenhum veículo cadastrado
+                    {t('nenhumRegistro')}
                   </TableCell>
                 </TableRow>
               )}
@@ -424,15 +426,15 @@ const Veiculos = () => {
 
       {/* Formulário de Veículo */}
       <Dialog open={openForm} onClose={handleCloseForm} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? 'Editar Veículo' : 'Novo Veículo'}</DialogTitle>
+        <DialogTitle>{editingId ? `${t('editar')} ${t('veiculo')}` : t('novoVeiculo')}</DialogTitle>
         <DialogContent>
           <FormControl fullWidth margin="dense" sx={{ mb: 2, mt: 1 }}>
-            <InputLabel id="cliente-label">Cliente</InputLabel>
+            <InputLabel id="cliente-label">{t('cliente')}</InputLabel>
             <Select
               labelId="cliente-label"
               value={formData.clienteId}
               onChange={handleSelectChange}
-              label="Cliente"
+              label={t('cliente')}
             >
               {clientes.map((cliente) => (
                 <MenuItem key={cliente.id} value={cliente.id}>
@@ -444,7 +446,7 @@ const Veiculos = () => {
           <TextField
             margin="dense"
             name="marca"
-            label="Marca"
+            label={t('marca')}
             type="text"
             fullWidth
             variant="outlined"
@@ -455,7 +457,7 @@ const Veiculos = () => {
           <TextField
             margin="dense"
             name="modelo"
-            label="Modelo"
+            label={t('modelo')}
             type="text"
             fullWidth
             variant="outlined"
@@ -466,7 +468,7 @@ const Veiculos = () => {
           <TextField
             margin="dense"
             name="ano"
-            label="Ano"
+            label={t('ano')}
             type="number"
             fullWidth
             variant="outlined"
@@ -477,7 +479,7 @@ const Veiculos = () => {
           <TextField
             margin="dense"
             name="placa"
-            label="Placa"
+            label={t('placa')}
             type="text"
             fullWidth
             variant="outlined"
@@ -487,28 +489,28 @@ const Veiculos = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseForm} color="inherit">
-            Cancelar
+            {t('cancelar')}
           </Button>
           <Button onClick={handleSubmit} color="primary" variant="contained">
-            Salvar
+            {t('salvar')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Diálogo de Confirmação de Exclusão */}
       <Dialog open={openDelete} onClose={handleCloseDelete}>
-        <DialogTitle>Confirmar Exclusão</DialogTitle>
+        <DialogTitle>{t('confirmarDelecao')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja excluir este veículo? Esta ação não pode ser desfeita.
+            {t('confirmarDelecao')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDelete} color="inherit">
-            Cancelar
+            {t('cancelar')}
           </Button>
           <Button onClick={handleDelete} color="error" variant="contained">
-            Excluir
+            {t('deletar')}
           </Button>
         </DialogActions>
       </Dialog>
