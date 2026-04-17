@@ -19,7 +19,8 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { useLanguage } from './LanguageContext';
-import { generateContratoPDF } from '../utils/gerarContratoPDFBilíngue';
+import { generateContratoPDFBlob } from '../utils/gerarContratoPDFBilíngue';
+import { converterParaBase64 } from '../utils/gerarContratoPDF';
 
 interface ContratoVendaDialogProps {
   open: boolean;
@@ -74,7 +75,42 @@ export default function ContratoVendaDialog({
 
       setLoading(true);
 
-      // 1. Chamar API backend para preparar dados
+      // 1. Gerar PDF no frontend (retorna Blob)
+      const pdfBlob = await generateContratoPDFBlob(
+        {
+          client_id: clienteId,
+          nome: clienteNome,
+          email: '',
+          telefone: '',
+          endereco: '',
+          cnh_number: ''
+        },
+        {
+          veiculo_id: veiculoId,
+          marca: veiculoInfo || '',
+          modelo: '',
+          ano: new Date().getFullYear(),
+          placa: '',
+          data_venda: new Date().toISOString().split('T')[0],
+          nova_placa: '',
+          data_transferencia: ''
+        },
+        precoNum,
+        sinalNum,
+        parcelasNum,
+        {
+          nome: 'Oficina Mecânica',
+          telefone: '(11) 0000-0000',
+          numeroAutorizacao: '001',
+          endereco: ''
+        },
+        idiomaSelecionado
+      );
+
+      // 2. Converter PDF para base64
+      const pdfBase64 = await converterParaBase64(pdfBlob);
+
+      // 3. Enviar para servidor com PDF em base64
       const response = await axios.post('/api/contracts/generate', {
         cliente_id: clienteId,
         veiculo_id: veiculoId,
@@ -82,24 +118,12 @@ export default function ContratoVendaDialog({
         sinal: sinalNum,
         parcelas: parcelasNum,
         idioma: idiomaSelecionado,
+        pdfBase64: pdfBase64, // ← Enviando PDF em base64
       });
 
       if (!response.data || !response.data.success) {
-        throw new Error('Erro ao preparar contrato no servidor');
+        throw new Error('Erro ao salvar contrato no servidor');
       }
-
-      const { dados } = response.data;
-
-      // 2. Gerar PDF no frontend
-      await generateContratoPDF(
-        dados.cliente,
-        dados.veiculo,
-        precoNum,
-        sinalNum,
-        parcelasNum,
-        dados.empresa,
-        idiomaSelecionado
-      );
 
       setSucesso(true);
       setTimeout(() => {

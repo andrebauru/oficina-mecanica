@@ -495,7 +495,7 @@ const Servicos = () => {
         <DialogTitle>Confirmar Exclusão</DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.
+            {t('temCertezaExcluirOS')}
           </Typography>
         </DialogContent>
         <DialogActions>

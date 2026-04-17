@@ -280,7 +280,7 @@ const Usuarios = () => {
               <TableRow>
                 <TableCell colSpan={5} sx={{ textAlign: 'center', py: 3 }}>
                   <Typography color="text.secondary">
-                    Nenhum usuário cadastrado
+                    {t('nenhummUsuarioCadastrado')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -363,7 +363,7 @@ const Usuarios = () => {
                 value={formData.senha}
                 onChange={e => setFormData(p => ({ ...p, senha: e.target.value }))}
                 error={!!errors.senha}
-                helperText={errors.senha || (!editingId ? '' : 'Deixe em branco para manter a senha atual')}
+                helperText={errors.senha || (!editingId ? '' : t('manterSenhaAtual'))}
                 disabled={saving}
               />
             </Grid>

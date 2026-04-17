@@ -489,8 +489,8 @@ export const VendasGestao: React.FC = () => {
                 label="Status"
                 onChange={(e: SelectChangeEvent) => setFiltroStatus(e.target.value as any)}
               >
-                <MenuItem value="todos">Todos os Status</MenuItem>
-                <MenuItem value="pendente">Pendentes</MenuItem>
+                <MenuItem value="todos">{t('todosOsStatus')}</MenuItem>
+                <MenuItem value="pendente">{t('pendente')}</MenuItem>
                 <MenuItem value="pago">Pagos</MenuItem>
                 <MenuItem value="atrasado">Atrasados</MenuItem>
                 <MenuItem value="devolvido">Devolvidos</MenuItem>
@@ -547,7 +547,7 @@ export const VendasGestao: React.FC = () => {
                 {vendasAgrupadas.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography color="textSecondary">Nenhuma venda encontrada</Typography>
+                      <Typography color="textSecondary">{t('nenhumaVendaEncontrada')}</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -660,7 +660,7 @@ export const VendasGestao: React.FC = () => {
 
       {/* Diálogo de Baixa */}
       <Dialog open={dialogBaixaOpen} onClose={() => !baixandoParcela && setDialogBaixaOpen(false)}>
-        <DialogTitle>Registrar Pagamento</DialogTitle>
+        <DialogTitle>{t('registrarPagamento')}</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           {parcelaParaBaixa && (
             <>

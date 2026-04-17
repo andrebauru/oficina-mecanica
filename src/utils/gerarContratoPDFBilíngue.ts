@@ -700,8 +700,57 @@ function gerarHTMLContrato(dados: DadosContrato): string {
 }
 
 // ============================================================================
-// FUNÇÃO PRINCIPAL DE GERAÇÃO DE PDF
+// FUNÇÃO PRINCIPAL DE GERAÇÃO DE PDF - RETORNA BLOB
 // ============================================================================
+
+export async function generateContratoPDFBlob(
+  cliente: Cliente,
+  veiculo: Veiculo,
+  preco: number,
+  sinal: number,
+  parcelas: number,
+  empresa: ConfiguracaoEmpresa,
+  idioma: 'pt' | 'vi' | 'fil' | 'ja' = 'pt'
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const dataEmissao = new Date().toISOString().split('T')[0];
+    
+    const dados: DadosContrato = {
+      cliente,
+      veiculo,
+      preco,
+      sinal,
+      parcelas,
+      dataEmissao,
+      empresa,
+      idioma,
+    };
+
+    const htmlContent = gerarHTMLContrato(dados);
+    const element = document.createElement('div');
+    element.innerHTML = htmlContent;
+
+    const opt = {
+      margin: 0,
+      filename: `contrato-${cliente.client_id}-${dataEmissao}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    const pdf = html2pdf();
+    pdf
+      .set(opt)
+      .from(element)
+      .output('blob')
+      .then((blob: Blob) => {
+        resolve(blob);
+      })
+      .catch((err: Error) => {
+        reject(err);
+      });
+  });
+}
 
 export async function generateContratoPDF(
   cliente: Cliente,

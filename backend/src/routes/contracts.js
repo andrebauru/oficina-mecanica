@@ -6,12 +6,9 @@ const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
-// Importar função de geração de PDF do frontend (será chamada via Node)
-// Para isso, precisamos de uma abordagem alternativa usando html2pdf em Node.js
-
 /**
  * POST /api/contracts/generate
- * Gera um contrato de venda em PDF
+ * Gera um contrato de venda em PDF e cria parcelas automaticamente
  * 
  * Body:
  * {
@@ -20,12 +17,13 @@ const router = express.Router();
  *   preco: number,
  *   sinal: number,
  *   parcelas: number,
- *   idioma: 'pt' | 'vi' | 'fil' | 'ja'
+ *   idioma: 'pt' | 'vi' | 'fil' | 'ja',
+ *   pdfBase64: string (PDF em base64 gerado pelo frontend)
  * }
  */
 router.post('/contracts/generate', async (req, res) => {
   try {
-    const { cliente_id, veiculo_id, preco, sinal, parcelas, idioma } = req.body;
+    const { cliente_id, veiculo_id, preco, sinal, parcelas, idioma, pdfBase64 } = req.body;
 
     // Validar parâmetros obrigatórios
     if (!cliente_id || !veiculo_id || !preco || !idioma) {
@@ -66,16 +64,6 @@ router.post('/contracts/generate', async (req, res) => {
 
     const veiculo = veiculoRows[0];
 
-    // Buscar configurações da empresa
-    const empresaRows = await query('SELECT * FROM empresas LIMIT 1');
-    const empresa = empresaRows?.[0] || {
-      nome: 'Oficina Mecânica',
-      cnpj: '',
-      endereco: '',
-      telefone: '',
-      email: ''
-    };
-
     // Validar/converter dados numéricos
     const precoNum = parseFloat(preco);
     const sinalNum = parseFloat(sinal || 0);
@@ -85,43 +73,9 @@ router.post('/contracts/generate', async (req, res) => {
       return res.status(400).json({ message: 'Preço deve ser um número positivo' });
     }
 
-    // Criar estrutura de dados para o contrato
-    const dadosContrato = {
-      cliente: {
-        nome: cliente.nome || '',
-        cpf: cliente.cpf || '',
-        rg: cliente.rg || '',
-        telefone: cliente.telefone || '',
-        email: cliente.email || '',
-        endereco: cliente.endereco || '',
-        cidade: cliente.cidade || '',
-        estado: cliente.estado || ''
-      },
-      veiculo: {
-        marca: veiculo.marca || '',
-        modelo: veiculo.modelo || '',
-        ano: veiculo.ano || '',
-        placa: veiculo.placa || '',
-        cor: veiculo.cor || '',
-        km: veiculo.km || 0
-      },
-      empresa: {
-        nome: empresa.nome || '',
-        cnpj: empresa.cnpj || '',
-        endereco: empresa.endereco || '',
-        telefone: empresa.telefone || '',
-        email: empresa.email || ''
-      },
-      preco: precoNum,
-      sinal: sinalNum,
-      parcelas: parcelasNum,
-      idioma: idioma,
-      dataVenda: new Date().toISOString().split('T')[0]
-    };
-
     // Criar ID único para o contrato
     const contractId = uuidv4();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = Date.now();
     const nomeArquivo = `contrato_${cliente_id}_${veiculo_id}_${timestamp}.pdf`;
 
     // Criar diretório de contratos se não existir
@@ -130,22 +84,28 @@ router.post('/contracts/generate', async (req, res) => {
       fs.mkdirSync(contractsDir, { recursive: true });
     }
 
-    // Caminho completo do arquivo
+    // Salvar PDF se fornecido
     const caminhoCompleto = path.join(contractsDir, nomeArquivo);
     const caminhoRelativo = path.relative(
       path.join(__dirname, '../../'),
       caminhoCompleto
     ).replace(/\\/g, '/');
 
-    // ========================================
-    // IMPORTANTE: Chamada para gerar PDF
-    // ========================================
-    // Como o gerador de PDF está no frontend, precisamos fazer uma chamada
-    // para um endpoint específico ou usar uma biblioteca Node.js
-    // Por enquanto, vamos retornar sucesso e a geração será feita no frontend
-    // quando o usuário confirmar no dialog
+    let fileSize = 0;
 
-    // Registrar no banco de dados
+    // Se houver PDF em base64, salvar arquivo
+    if (pdfBase64) {
+      try {
+        const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+        fs.writeFileSync(caminhoCompleto, pdfBuffer);
+        fileSize = pdfBuffer.length;
+      } catch (err) {
+        console.error('Erro ao salvar PDF:', err);
+        // Continuar mesmo se falhar ao salvar PDF
+      }
+    }
+
+    // Registrar contrato no banco de dados
     await query(
       `INSERT INTO client_documents 
        (id, client_id, document_type, path, original_filename, file_size, created_at, updated_at)
@@ -156,24 +116,73 @@ router.post('/contracts/generate', async (req, res) => {
         'contrato_venda',
         caminhoRelativo,
         nomeArquivo,
-        0 // Tamanho será atualizado após gerar o PDF
+        fileSize
       ]
     );
 
-    // Retornar informações para o frontend gerar o PDF
+    // Criar parcelas automaticamente
+    const parcelasArray = [];
+    const restante = precoNum - sinalNum;
+    const valorParcela = parcelasNum > 0 ? (restante / parcelasNum).toFixed(2) : 0;
+
+    // Adicionar sinal como primeira parcela (se houver)
+    if (sinalNum > 0) {
+      parcelasArray.push({
+        numero: 0,
+        descricao: 'Sinal',
+        valor: sinalNum,
+        datavencimento: new Date().toISOString().split('T')[0],
+        status: 'pendente'
+      });
+    }
+
+    // Criar parcelas futuras (30 dias cada)
+    for (let i = 1; i <= parcelasNum; i++) {
+      const dataVencimento = new Date();
+      dataVencimento.setDate(dataVencimento.getDate() + (i * 30));
+
+      parcelasArray.push({
+        numero: i,
+        descricao: `Parcela ${i}/${parcelasNum}`,
+        valor: parseFloat(valorParcela),
+        datavencimento: dataVencimento.toISOString().split('T')[0],
+        status: 'pendente'
+      });
+    }
+
+    // Salvar parcelas no banco
+    for (const parcela of parcelasArray) {
+      const parcelaId = uuidv4();
+      await query(
+        `INSERT INTO vendas_parcelas 
+         (id, contrato_id, client_id, numero_parcela, valor, data_vencimento, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          parcelaId,
+          contractId,
+          cliente_id,
+          parcela.numero,
+          parcela.valor,
+          parcela.datavencimento,
+          parcela.status
+        ]
+      );
+    }
+
+    // Retornar resposta com sucesso
     return res.status(201).json({
       success: true,
       contractId: contractId,
-      dados: dadosContrato,
       nomeArquivo: nomeArquivo,
       caminhoDestino: caminhoRelativo,
-      message: 'Dados do contrato preparados. PDF será gerado no frontend.'
+      parcelas: parcelasArray,
+      message: 'Contrato gerado e salvo com sucesso! Parcelas criadas automaticamente.'
     });
 
   } catch (error) {
-    console.error('Erro ao preparar contrato:', error);
+    console.error('Erro ao gerar contrato:', error);
     return res.status(500).json({
-      message: 'Erro ao preparar contrato',
+      message: 'Erro ao gerar contrato',
       error: error.message
     });
   }
@@ -268,6 +277,133 @@ router.delete('/contracts/:contractId', async (req, res) => {
     console.error('Erro ao deletar contrato:', error);
     return res.status(500).json({
       message: 'Erro ao deletar contrato',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/clients/:clientId/parcelas
+ * Lista todas as parcelas de um cliente
+ */
+router.get('/clients/:clientId/parcelas', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const rows = await query(
+      `SELECT * FROM vendas_parcelas 
+       WHERE client_id = ? 
+       ORDER BY numero_parcela ASC`,
+      [clientId]
+    );
+
+    return res.json(rows || []);
+  } catch (error) {
+    console.error('Erro ao buscar parcelas:', error);
+    return res.status(500).json({
+      message: 'Erro ao buscar parcelas',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/contracts/:contractId/parcelas
+ * Lista todas as parcelas de um contrato
+ */
+router.get('/contracts/:contractId/parcelas', async (req, res) => {
+  try {
+    const { contractId } = req.params;
+
+    const rows = await query(
+      `SELECT * FROM vendas_parcelas 
+       WHERE contrato_id = ? 
+       ORDER BY numero_parcela ASC`,
+      [contractId]
+    );
+
+    return res.json(rows || []);
+  } catch (error) {
+    console.error('Erro ao buscar parcelas do contrato:', error);
+    return res.status(500).json({
+      message: 'Erro ao buscar parcelas do contrato',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/parcelas/:parcelaId
+ * Atualiza o status de uma parcela (pago, atrasado, pendente, devolvido)
+ */
+router.put('/parcelas/:parcelaId', async (req, res) => {
+  try {
+    const { parcelaId } = req.params;
+    const { status, data_pagamento, observacoes } = req.body;
+
+    // Validar status
+    const statusValidos = ['pendente', 'pago', 'atrasado', 'devolvido'];
+    if (status && !statusValidos.includes(status)) {
+      return res.status(400).json({
+        message: `Status inválido. Status suportados: ${statusValidos.join(', ')}`
+      });
+    }
+
+    // Buscar parcela
+    const rows = await query(
+      'SELECT * FROM vendas_parcelas WHERE id = ? LIMIT 1',
+      [parcelaId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Parcela não encontrada' });
+    }
+
+    // Preparar dados a atualizar
+    const campos = [];
+    const valores = [];
+
+    if (status) {
+      campos.push('status = ?');
+      valores.push(status);
+    }
+
+    if (data_pagamento) {
+      campos.push('data_pagamento = ?');
+      valores.push(data_pagamento);
+    }
+
+    if (observacoes !== undefined) {
+      campos.push('observacoes = ?');
+      valores.push(observacoes || null);
+    }
+
+    campos.push('updated_at = NOW()');
+    valores.push(parcelaId);
+
+    // Atualizar parcela
+    await query(
+      `UPDATE vendas_parcelas 
+       SET ${campos.join(', ')} 
+       WHERE id = ?`,
+      valores
+    );
+
+    // Retornar parcela atualizada
+    const updatedRows = await query(
+      'SELECT * FROM vendas_parcelas WHERE id = ? LIMIT 1',
+      [parcelaId]
+    );
+
+    return res.json({
+      success: true,
+      parcela: updatedRows[0],
+      message: 'Parcela atualizada com sucesso'
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar parcela:', error);
+    return res.status(500).json({
+      message: 'Erro ao atualizar parcela',
       error: error.message
     });
   }

@@ -575,7 +575,7 @@ const VendasCarros = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={8} align="center">
-                    Nenhuma venda de carro cadastrada
+                    {t('nenhumaVenda')}
                   </TableCell>
                 </TableRow>
               )}
@@ -745,7 +745,7 @@ const VendasCarros = () => {
         <DialogTitle>Confirmar Exclusão</DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja excluir esta venda de carro? Esta ação não pode ser desfeita.
+            {t('temCertezaExcluirOS')}
           </Typography>
         </DialogContent>
         <DialogActions>

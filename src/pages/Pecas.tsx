@@ -444,7 +444,7 @@ const Pecas = () => {
         <DialogTitle>Confirmar Exclusão</DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja excluir esta peça? Esta ação não pode ser desfeita.
+            {t('temCertezaExcluirOS')}
           </Typography>
         </DialogContent>
         <DialogActions>

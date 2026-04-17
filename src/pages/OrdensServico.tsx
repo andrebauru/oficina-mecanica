@@ -1257,7 +1257,7 @@ const OrdensServico = () => {
         <DialogTitle>Confirmar Exclusão</DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja excluir esta ordem de serviço? Esta ação não pode ser desfeita.
+            {t('temCertezaExcluirOS')}
           </Typography>
         </DialogContent>
         <DialogActions>

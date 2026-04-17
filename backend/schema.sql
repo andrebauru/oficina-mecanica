@@ -314,3 +314,24 @@ CREATE TABLE client_documents (
   KEY idx_client_documents_type (document_type),
   CONSTRAINT fk_client_documents_client FOREIGN KEY (client_id) REFERENCES clientes (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE vendas_parcelas (
+  id VARCHAR(50) NOT NULL,
+  contrato_id VARCHAR(50) NOT NULL,
+  client_id VARCHAR(50) NOT NULL,
+  numero_parcela INT NOT NULL DEFAULT 0,
+  valor DECIMAL(12, 2) NOT NULL,
+  data_vencimento DATE NOT NULL,
+  data_pagamento DATE NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'pendente',
+  observacoes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_vendas_parcelas_contrato (contrato_id),
+  KEY idx_vendas_parcelas_client (client_id),
+  KEY idx_vendas_parcelas_status (status),
+  KEY idx_vendas_parcelas_vencimento (data_vencimento),
+  CONSTRAINT fk_vendas_parcelas_contrato FOREIGN KEY (contrato_id) REFERENCES client_documents (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_vendas_parcelas_client FOREIGN KEY (client_id) REFERENCES clientes (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
