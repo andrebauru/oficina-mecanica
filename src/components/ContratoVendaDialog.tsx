@@ -38,6 +38,7 @@ export default function ContratoVendaDialog({
   veiculoId,
   veiculoInfo,
 }: ContratoVendaDialogProps) {
+  const { t } = useLanguage();
   const { language } = useLanguage();
   const [idiomaSelecionado, setIdiomaSelecionado] = useState<'pt' | 'vi' | 'fil' | 'ja'>(
     (language as 'pt' | 'vi' | 'fil' | 'ja') || 'pt'
@@ -128,7 +129,7 @@ export default function ContratoVendaDialog({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 'bold', borderBottom: '2px solid #FFD600' }}>
-        Gerar Contrato de Venda
+        {t('contratoBotao')}
       </DialogTitle>
 
       <DialogContent sx={{ py: 2 }}>
@@ -142,14 +143,14 @@ export default function ContratoVendaDialog({
           }}
         >
           <Typography variant="caption" sx={{ color: 'rgba(0,0,0,0.6)', display: 'block' }}>
-            Cliente
+            {t('cliente')}
           </Typography>
           <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
             {clienteNome}
           </Typography>
 
           <Typography variant="caption" sx={{ color: 'rgba(0,0,0,0.6)', display: 'block' }}>
-            Veículo
+            {t('veiculo')}
           </Typography>
           <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
             {veiculoInfo}
@@ -158,7 +159,7 @@ export default function ContratoVendaDialog({
 
         {/* Seletor de idioma */}
         <FormControl fullWidth sx={{ mb: 3 }}>
-          <FormLabel sx={{ mb: 1, fontWeight: 'bold' }}>Idioma do Contrato</FormLabel>
+          <FormLabel sx={{ mb: 1, fontWeight: 'bold' }}>{t('idiomaLabel')} {t('gerarContrato')}</FormLabel>
           <RadioGroup
             row
             value={idiomaSelecionado}
@@ -180,7 +181,7 @@ export default function ContratoVendaDialog({
         {/* Campos de preço */}
         <TextField
           fullWidth
-          label="Preço Total (R$)"
+          label={t('valorTotal')}
           type="number"
           value={preco}
           onChange={(e) => setPreco(e.target.value)}
@@ -192,7 +193,7 @@ export default function ContratoVendaDialog({
 
         <TextField
           fullWidth
-          label="Valor do Sinal (R$)"
+          label={t('sinal')}
           type="number"
           value={sinal}
           onChange={(e) => setSinal(e.target.value)}
@@ -203,7 +204,7 @@ export default function ContratoVendaDialog({
 
         <TextField
           fullWidth
-          label="Número de Parcelas"
+          label={t('parcelas')}
           type="number"
           value={parcelas}
           onChange={(e) => setParcelas(e.target.value)}
@@ -222,18 +223,18 @@ export default function ContratoVendaDialog({
             }}
           >
             <Typography variant="caption" sx={{ color: 'rgba(0,0,0,0.6)' }}>
-              RESUMO
+              {t('resumo')}
             </Typography>
             <Box sx={{ mt: 1 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2">Preço Total:</Typography>
+                <Typography variant="body2">{t('valorTotal')}:</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                   R$ {parseFloat(preco).toFixed(2)}
                 </Typography>
               </Box>
               {sinal && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Typography variant="body2">Sinal:</Typography>
+                  <Typography variant="body2">{t('sinal')}:</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
                     R$ {parseFloat(sinal).toFixed(2)}
                   </Typography>
@@ -260,7 +261,7 @@ export default function ContratoVendaDialog({
 
         {sucesso && (
           <Alert severity="success" sx={{ mb: 2 }}>
-            Contrato gerado com sucesso! Fechando...
+            {t('contratoGerado')}
           </Alert>
         )}
       </DialogContent>
@@ -273,7 +274,7 @@ export default function ContratoVendaDialog({
           }}
           disabled={loading}
         >
-          Cancelar
+          {t('cancelar')}
         </Button>
         <Button onClick={handleLimparFormulario} disabled={loading} variant="outlined">
           Limpar
@@ -289,7 +290,7 @@ export default function ContratoVendaDialog({
             '&:hover': { background: '#FFC600' },
           }}
         >
-          {loading ? <CircularProgress size={24} /> : 'Gerar Contrato'}
+          {loading ? <CircularProgress size={24} /> : t('gerarContrato')}
         </Button>
       </DialogActions>
     </Dialog>
