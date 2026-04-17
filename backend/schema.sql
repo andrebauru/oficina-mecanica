@@ -6,6 +6,8 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS parcelas;
 DROP TABLE IF EXISTS documentos;
+DROP TABLE IF EXISTS client_documents;
+DROP TABLE IF EXISTS client_interactions;
 DROP TABLE IF EXISTS vendas;
 DROP TABLE IF EXISTS vendas_carros;
 DROP TABLE IF EXISTS ordem_servico_pecas;
@@ -54,6 +56,8 @@ CREATE TABLE clientes (
   email VARCHAR(190) NULL,
   telefone VARCHAR(40) NULL,
   endereco TEXT NULL,
+  cnh_number VARCHAR(20) NULL,
+  observacoes_gerais TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -69,11 +73,15 @@ CREATE TABLE veiculos (
   placa VARCHAR(20) NOT NULL,
   chassi VARCHAR(80) NULL,
   kilometragem INT NULL,
+  data_venda DATE NULL,
+  nova_placa VARCHAR(20) NULL,
+  data_transferencia DATE NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_veiculos_placa (placa),
   KEY idx_veiculos_cliente (cliente_id),
+  KEY idx_veiculos_data_venda (data_venda),
   CONSTRAINT fk_veiculos_cliente FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -275,4 +283,34 @@ CREATE TABLE documentos (
   PRIMARY KEY (id),
   KEY idx_documentos_entity (entity_type, entity_id),
   KEY idx_documentos_referencia (referencia_tipo, referencia_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE client_interactions (
+  id VARCHAR(50) NOT NULL,
+  client_id VARCHAR(50) NOT NULL,
+  interaction_text TEXT NOT NULL,
+  observation TEXT NULL,
+  interaction_type VARCHAR(50) NULL DEFAULT 'atendimento',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_client_interactions_client (client_id),
+  KEY idx_client_interactions_date (created_at),
+  CONSTRAINT fk_client_interactions_client FOREIGN KEY (client_id) REFERENCES clientes (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE client_documents (
+  id VARCHAR(50) NOT NULL,
+  client_id VARCHAR(50) NOT NULL,
+  document_type VARCHAR(100) NOT NULL,
+  path VARCHAR(255) NOT NULL,
+  contract_photo VARCHAR(255) NULL,
+  file_size INT NULL,
+  original_filename VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_client_documents_client (client_id),
+  KEY idx_client_documents_type (document_type),
+  CONSTRAINT fk_client_documents_client FOREIGN KEY (client_id) REFERENCES clientes (id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -16,7 +16,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     // Carregar idioma salvo no localStorage
     const saved = localStorage.getItem('app-language') as Language;
-    if (saved && (saved === 'pt' || saved === 'fil' || saved === 'vi')) {
+    if (saved && (saved === 'pt' || saved === 'fil' || saved === 'vi' || saved === 'ja')) {
       setLanguageState(saved);
     }
     setMounted(true);

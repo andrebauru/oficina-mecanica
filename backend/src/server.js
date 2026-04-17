@@ -10,6 +10,8 @@ const {
   toClientRecord,
   allowedFilterMap,
 } = require('./config/entities');
+const clientCrmRouter = require('./routes/clientCrm');
+const contractsRouter = require('./routes/contracts');
 
 const app = express();
 
@@ -28,6 +30,11 @@ app.use(session({
   },
 }));
 app.use(sessionTimeout);
+
+// Usar rotas de CRM de clientes
+app.use('/api', clientCrmRouter);
+// Usar rotas de contratos
+app.use('/api', contractsRouter);
 
 app.get('/api/health', async (_req, res) => {
   try {

@@ -34,6 +34,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import { SelectChangeEvent } from '@mui/material/Select';
 import DocumentosDialog from '../components/DocumentosDialog';
+import ContratoVendaDialog from '../components/ContratoVendaDialog';
 import { useLanguage } from '../components/LanguageContext';
 
 interface Veiculo {
@@ -43,6 +44,9 @@ interface Veiculo {
   modelo: string;
   ano: number;
   placa: string;
+  data_venda?: string;
+  nova_placa?: string;
+  data_transferencia?: string;
 }
 
 interface Cliente {
@@ -56,6 +60,9 @@ interface VeiculoFormData {
   modelo: string;
   ano: number;
   placa: string;
+  data_venda?: string;
+  nova_placa?: string;
+  data_transferencia?: string;
 }
 
 const veiculoVazio: VeiculoFormData = {
@@ -63,7 +70,10 @@ const veiculoVazio: VeiculoFormData = {
   marca: '',
   modelo: '',
   ano: new Date().getFullYear(),
-  placa: ''
+  placa: '',
+  data_venda: undefined,
+  nova_placa: '',
+  data_transferencia: undefined
 };
 
 const Veiculos = () => {
@@ -110,7 +120,10 @@ const Veiculos = () => {
         marca: veiculo.marca,
         modelo: veiculo.modelo,
         ano: veiculo.ano,
-        placa: veiculo.placa
+        placa: veiculo.placa,
+        data_venda: veiculo.data_venda,
+        nova_placa: veiculo.nova_placa,
+        data_transferencia: veiculo.data_transferencia
       });
       setEditingId(veiculo.id);
     } else {
@@ -212,11 +225,25 @@ const Veiculos = () => {
 
   const [openDocs, setOpenDocs] = useState(false);
   const [docsVeiculo, setDocsVeiculo] = useState<{ id: string; nome: string } | null>(null);
+  const [openContratoVenda, setOpenContratoVenda] = useState(false);
+  const [contratoVendaVeiculo, setContratoVendaVeiculo] = useState<{ id: string; clienteId: string; clienteNome: string; veiculoInfo: string } | null>(null);
 
   const handleOpenDocs = (veiculo: Veiculo) => {
     const nome = `${veiculo.marca} ${veiculo.modelo} · ${veiculo.placa}`;
     setDocsVeiculo({ id: veiculo.id, nome });
     setOpenDocs(true);
+  };
+
+  const handleOpenContratoVenda = (veiculo: Veiculo) => {
+    const clienteNome = getClienteNome(veiculo.clienteId);
+    const veiculoInfo = `${veiculo.marca} ${veiculo.modelo} (${veiculo.placa})`;
+    setContratoVendaVeiculo({
+      id: veiculo.id,
+      clienteId: veiculo.clienteId,
+      clienteNome,
+      veiculoInfo
+    });
+    setOpenContratoVenda(true);
   };
 
   const [veiculosFiltrados, setVeiculosFiltrados] = useState<Veiculo[]>([]);
@@ -369,6 +396,24 @@ const Veiculos = () => {
                     {t('placa')}
                   </TableSortLabel>
                 </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={ordenacao.campo === 'data_venda'}
+                    direction={ordenacao.campo === 'data_venda' ? ordenacao.direcao : 'asc'}
+                    onClick={() => handleOrdenacaoChange('data_venda' as any)}
+                  >
+                    Data Venda
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={ordenacao.campo === 'data_transferencia'}
+                    direction={ordenacao.campo === 'data_transferencia' ? ordenacao.direcao : 'asc'}
+                    onClick={() => handleOrdenacaoChange('data_transferencia' as any)}
+                  >
+                    Data Transfer.
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="center">{t('acao')}</TableCell>
               </TableRow>
             </TableHead>
@@ -386,6 +431,8 @@ const Veiculos = () => {
                     <TableCell>{veiculo.modelo}</TableCell>
                     <TableCell>{veiculo.ano}</TableCell>
                     <TableCell>{veiculo.placa}</TableCell>
+                    <TableCell>{veiculo.data_venda ? veiculo.data_venda.split('-').reverse().join('/') : '-'}</TableCell>
+                    <TableCell>{veiculo.data_transferencia ? veiculo.data_transferencia.split('-').reverse().join('/') : '-'}</TableCell>
                     <TableCell align="center">
                       <IconButton
                         color="secondary"
@@ -394,6 +441,14 @@ const Veiculos = () => {
                         title={t('documentosFotos')}
                       >
                         <PhotoLibraryIcon />
+                      </IconButton>
+                      <IconButton
+                        color="success"
+                        onClick={(e) => { e.stopPropagation(); handleOpenContratoVenda(veiculo); }}
+                        size="small"
+                        title="Gerar Contrato de Venda"
+                      >
+                        📄
                       </IconButton>
                       <IconButton
                         color="primary"
@@ -485,6 +540,73 @@ const Veiculos = () => {
             variant="outlined"
             value={formData.placa}
             onChange={handleInputChange}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            name="data_venda"
+            label="Data de Venda (AAAA/MM/DD)"
+            type="date"
+            fullWidth
+            variant="outlined"
+            value={formData.data_venda ? new Date(formData.data_venda).toISOString().split('T')[0] : ''}
+            onChange={(e) => {
+              if (e.target.value) {
+                const date = new Date(e.target.value);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                setFormData(prev => ({
+                  ...prev,
+                  data_venda: `${year}-${month}-${day}`
+                }));
+              } else {
+                setFormData(prev => ({
+                  ...prev,
+                  data_venda: undefined
+                }));
+              }
+            }}
+            sx={{ mb: 2 }}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            margin="dense"
+            name="nova_placa"
+            label="Nova Placa"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={formData.nova_placa || ''}
+            onChange={handleInputChange}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            name="data_transferencia"
+            label="Data de Transferência (AAAA/MM/DD)"
+            type="date"
+            fullWidth
+            variant="outlined"
+            value={formData.data_transferencia ? new Date(formData.data_transferencia).toISOString().split('T')[0] : ''}
+            onChange={(e) => {
+              if (e.target.value) {
+                const date = new Date(e.target.value);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                setFormData(prev => ({
+                  ...prev,
+                  data_transferencia: `${year}-${month}-${day}`
+                }));
+              } else {
+                setFormData(prev => ({
+                  ...prev,
+                  data_transferencia: undefined
+                }));
+              }
+            }}
+            InputLabelProps={{ shrink: true }}
           />
         </DialogContent>
         <DialogActions>
@@ -523,6 +645,18 @@ const Veiculos = () => {
           entityId={docsVeiculo.id}
           entityType="veiculo"
           entityNome={docsVeiculo.nome}
+        />
+      )}
+
+      {/* Contrato de Venda Dialog */}
+      {contratoVendaVeiculo && (
+        <ContratoVendaDialog
+          open={openContratoVenda}
+          onClose={() => setOpenContratoVenda(false)}
+          clienteId={contratoVendaVeiculo.clienteId}
+          clienteNome={contratoVendaVeiculo.clienteNome}
+          veiculoId={contratoVendaVeiculo.id}
+          veiculoInfo={contratoVendaVeiculo.veiculoInfo}
         />
       )}
 

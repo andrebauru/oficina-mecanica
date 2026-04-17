@@ -28,7 +28,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import DocumentosDialog from '../components/DocumentosDialog';
+import ClientCrmDialog from '../components/ClientCrmDialog';
+import ContratoVendaDialog from '../components/ContratoVendaDialog';
 import { useLanguage } from '../components/LanguageContext';
 
 interface Cliente {
@@ -37,6 +40,8 @@ interface Cliente {
   email: string;
   telefone: string;
   endereco: string;
+  cnh_number?: string;
+  observacoes_gerais?: string;
 }
 
 interface ClienteFormData {
@@ -44,13 +49,17 @@ interface ClienteFormData {
   email: string;
   telefone: string;
   endereco: string;
+  cnh_number: string;
+  observacoes_gerais: string;
 }
 
 const clienteVazio: ClienteFormData = {
   nome: '',
   email: '',
   telefone: '',
-  endereco: ''
+  endereco: '',
+  cnh_number: '',
+  observacoes_gerais: ''
 };
 
 const Clientes = () => {
@@ -70,6 +79,12 @@ const Clientes = () => {
   });
   const [openDocs, setOpenDocs] = useState(false);
   const [docsCliente, setDocsCliente] = useState<{ id: string; nome: string } | null>(null);
+  const [openCrm, setOpenCrm] = useState(false);
+  const [crmCliente, setCrmCliente] = useState<{ id: string; nome: string } | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [documentsClienteId, setDocumentsClienteId] = useState<string | null>(null);
+  const [openContratoVenda, setOpenContratoVenda] = useState(false);
+  const [contratoVendaCliente, setContratoVendaCliente] = useState<{ id: string; nome: string } | null>(null);
 
   const [filtro, setFiltro] = useState('');
   const [ordenacao, setOrdenacao] = useState<{
@@ -108,12 +123,16 @@ const Clientes = () => {
         nome: cliente.nome,
         email: cliente.email,
         telefone: cliente.telefone,
-        endereco: cliente.endereco
+        endereco: cliente.endereco,
+        cnh_number: cliente.cnh_number || '',
+        observacoes_gerais: cliente.observacoes_gerais || ''
       });
       setEditingId(cliente.id);
+      setDocumentsClienteId(cliente.id);
     } else {
       setFormData(clienteVazio);
       setEditingId(null);
+      setDocumentsClienteId(null);
     }
     setOpenForm(true);
   };
@@ -199,6 +218,16 @@ const Clientes = () => {
     setOpenDocs(true);
   };
 
+  const handleOpenCrm = (cliente: Cliente) => {
+    setCrmCliente({ id: cliente.id, nome: cliente.nome });
+    setOpenCrm(true);
+  };
+
+  const handleOpenContratoVenda = (cliente: Cliente) => {
+    setContratoVendaCliente({ id: cliente.id, nome: cliente.nome });
+    setOpenContratoVenda(true);
+  };
+
   const handleFiltroChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setFiltro(event.target.value.toLowerCase());
   };
@@ -218,7 +247,8 @@ const Clientes = () => {
         cliente.nome.toLowerCase().includes(filtro) ||
         cliente.email.toLowerCase().includes(filtro) ||
         cliente.telefone.toLowerCase().includes(filtro) ||
-        cliente.endereco.toLowerCase().includes(filtro)
+        cliente.endereco.toLowerCase().includes(filtro) ||
+        (cliente.cnh_number && cliente.cnh_number.toLowerCase().includes(filtro))
       );
     }
 
@@ -324,6 +354,12 @@ const Clientes = () => {
                   <TableCell>{cliente.telefone}</TableCell>
                   <TableCell>{cliente.endereco}</TableCell>
                   <TableCell align="center">
+                    <IconButton onClick={(e) => { e.stopPropagation(); handleOpenCrm(cliente); }} color="info" title="CRM - Documentos e Histórico">
+                      <AssignmentIcon />
+                    </IconButton>
+                    <IconButton onClick={(e) => { e.stopPropagation(); handleOpenContratoVenda(cliente); }} color="success" title="Gerar Contrato de Venda">
+                      📄
+                    </IconButton>
                     <IconButton onClick={(e) => { e.stopPropagation(); handleOpenDocs(cliente); }} color="secondary" title={t('documentosFotos')}>
                       <PhotoLibraryIcon />
                     </IconButton>
@@ -390,6 +426,31 @@ const Clientes = () => {
             variant="outlined"
             value={formData.endereco}
             onChange={handleInputChange}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            name="cnh_number"
+            label="Número da CNH"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={formData.cnh_number}
+            onChange={handleInputChange}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            name="observacoes_gerais"
+            label="Observações Gerais"
+            type="text"
+            fullWidth
+            multiline
+            rows={3}
+            variant="outlined"
+            value={formData.observacoes_gerais}
+            onChange={handleInputChange}
+            sx={{ mb: 2 }}
           />
         </DialogContent>
         <DialogActions>
@@ -428,6 +489,28 @@ const Clientes = () => {
           entityId={docsCliente.id}
           entityType="cliente"
           entityNome={docsCliente.nome}
+        />
+      )}
+
+      {/* CRM Dialog */}
+      {crmCliente && (
+        <ClientCrmDialog
+          open={openCrm}
+          onClose={() => setOpenCrm(false)}
+          clientId={crmCliente.id}
+          clientName={crmCliente.nome}
+        />
+      )}
+
+      {/* Contrato de Venda Dialog */}
+      {contratoVendaCliente && (
+        <ContratoVendaDialog
+          open={openContratoVenda}
+          onClose={() => setOpenContratoVenda(false)}
+          clienteId={contratoVendaCliente.id}
+          clienteNome={contratoVendaCliente.nome}
+          veiculoId=""
+          veiculoInfo="Selecionar veículo"
         />
       )}
 

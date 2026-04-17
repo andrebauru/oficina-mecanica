@@ -171,7 +171,7 @@ const Navbar = ({ expanded, onToggle }: NavbarProps) => {
               </Typography>
               <Select
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as 'pt' | 'fil' | 'vi')}
+                onChange={(e) => setLanguage(e.target.value as 'pt' | 'fil' | 'vi' | 'ja')}
                 size="small"
                 sx={{
                   width: '100%',
