@@ -540,7 +540,7 @@ app.use(sessionTimeout);
 // Middleware de autenticação: bloqueia mutações sem sessão ativa
 const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/auth/setup', '/api/auth/status', '/api/session', '/api/health'];
 function requireAuth(req, res, next) {
-  if (req.method === 'GET') return next();
+  if (req.method === 'OPTIONS') return next();
   if (AUTH_PUBLIC_PATHS.some(p => req.path === p)) return next();
   if (!req.session?.user) {
     return res.status(401).json({ message: 'Não autenticado. Faça login para continuar.' });

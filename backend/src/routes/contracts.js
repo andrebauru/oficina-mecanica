@@ -3,8 +3,187 @@ const path = require('path');
 const fs = require('fs');
 const { query } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const { generateContractPdfBuffer } = require('../services/contractPdf');
 
 const router = express.Router();
+const CONTRACTS_DIR = path.join(__dirname, '../../storage/uploads/contracts');
+
+function ensureContractsDir() {
+  if (!fs.existsSync(CONTRACTS_DIR)) {
+    fs.mkdirSync(CONTRACTS_DIR, { recursive: true });
+  }
+}
+
+function normalizeRelativeContractPath(absolutePath) {
+  return path.relative(path.join(__dirname, '../../'), absolutePath).replace(/\\/g, '/');
+}
+
+function resolveSafeAbsolutePath(relativePath) {
+  const absolute = path.resolve(path.join(__dirname, '../../'), relativePath);
+  const base = path.resolve(path.join(__dirname, '../../storage/uploads/contracts'));
+  if (!absolute.startsWith(base)) return null;
+  return absolute;
+}
+
+// Dashboard de entrega - vendas sem contrato gerado
+router.get('/vendas_carros/pending-delivery', async (_req, res) => {
+  try {
+    const rows = await query(
+      `SELECT
+        v.id,
+        v.clienteId,
+        COALESCE(c.nome, v.cliente_nome, 'Cliente') AS clienteNome,
+        v.fabricante,
+        v.modelo,
+        v.ano,
+        v.valor_total AS valorTotal,
+        v.created_at,
+        v.contratoPath,
+        v.contratoGeradoEm
+       FROM vendas_carros v
+       LEFT JOIN clientes c ON c.id = v.clienteId
+       WHERE v.contratoPath IS NULL OR v.contratoPath = ''
+       ORDER BY v.created_at DESC`
+    );
+
+    return res.json(rows || []);
+  } catch (error) {
+    console.error('Erro ao listar vendas pendentes de entrega:', error);
+    return res.status(500).json({ message: 'Erro ao listar pendências de entrega', error: error.message });
+  }
+});
+
+// Dashboard de entrega - vendas com contrato gerado
+router.get('/vendas_carros/contracts/generated', async (_req, res) => {
+  try {
+    const rows = await query(
+      `SELECT
+        v.id,
+        v.clienteId,
+        COALESCE(c.nome, v.cliente_nome, 'Cliente') AS clienteNome,
+        v.fabricante,
+        v.modelo,
+        v.ano,
+        v.valor_total AS valorTotal,
+        v.contratoPath,
+        v.contratoGeradoEm
+       FROM vendas_carros v
+       LEFT JOIN clientes c ON c.id = v.clienteId
+       WHERE v.contratoPath IS NOT NULL AND v.contratoPath <> ''
+       ORDER BY v.contratoGeradoEm DESC`
+    );
+
+    return res.json(rows || []);
+  } catch (error) {
+    console.error('Erro ao listar contratos gerados de vendas_carros:', error);
+    return res.status(500).json({ message: 'Erro ao listar contratos gerados', error: error.message });
+  }
+});
+
+// Geração de contrato server-side por venda de carro (template no backend)
+router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
+  try {
+    const { vendaId } = req.params;
+    const idioma = String(req.body?.idioma || 'pt').trim().toLowerCase();
+
+    if (!['pt', 'ja'].includes(idioma)) {
+      return res.status(400).json({ message: 'Idioma inválido. Use pt ou ja.' });
+    }
+
+    const vendaRows = await query('SELECT * FROM vendas_carros WHERE id = ? LIMIT 1', [vendaId]);
+    if (vendaRows.length === 0) {
+      return res.status(404).json({ message: 'Venda não encontrada' });
+    }
+    const venda = vendaRows[0];
+
+    const clienteRows = venda.clienteId
+      ? await query('SELECT * FROM clientes WHERE id = ? LIMIT 1', [venda.clienteId])
+      : [];
+    const cliente = clienteRows[0] || null;
+
+    const configRows = await query('SELECT * FROM configuracoes ORDER BY createdAt DESC LIMIT 1');
+    const configuracao = configRows[0] || null;
+
+    ensureContractsDir();
+    const fileName = `contrato_venda_${venda.id}_${Date.now()}_${idioma}.pdf`;
+    const absolutePath = path.join(CONTRACTS_DIR, fileName);
+    const relativePath = normalizeRelativeContractPath(absolutePath);
+
+    const pdfBuffer = await generateContractPdfBuffer({
+      idioma,
+      venda,
+      cliente,
+      configuracao,
+    });
+
+    fs.writeFileSync(absolutePath, pdfBuffer);
+
+    await query(
+      'UPDATE vendas_carros SET contratoPath = ?, contratoGeradoEm = NOW() WHERE id = ?',
+      [relativePath, venda.id]
+    );
+
+    return res.status(201).json({
+      success: true,
+      vendaId: venda.id,
+      idioma,
+      contratoPath: relativePath,
+      contratoGeradoEm: new Date().toISOString(),
+      viewUrl: `/api/vendas_carros/${venda.id}/contracts/view`,
+      downloadUrl: `/api/vendas_carros/${venda.id}/contracts/download`,
+    });
+  } catch (error) {
+    console.error('Erro ao gerar contrato de venda de carro:', error);
+    return res.status(500).json({ message: 'Erro ao gerar contrato de venda de carro', error: error.message });
+  }
+});
+
+// Visualização inline do contrato já gerado
+router.get('/vendas_carros/:vendaId/contracts/view', async (req, res) => {
+  try {
+    const { vendaId } = req.params;
+    const rows = await query('SELECT contratoPath FROM vendas_carros WHERE id = ? LIMIT 1', [vendaId]);
+    const contratoPath = rows[0]?.contratoPath;
+
+    if (!contratoPath) {
+      return res.status(404).json({ message: 'Contrato não encontrado para esta venda' });
+    }
+
+    const absolutePath = resolveSafeAbsolutePath(contratoPath);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      return res.status(404).json({ message: 'Arquivo de contrato não encontrado no servidor' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    return res.sendFile(absolutePath);
+  } catch (error) {
+    console.error('Erro ao visualizar contrato de venda de carro:', error);
+    return res.status(500).json({ message: 'Erro ao visualizar contrato', error: error.message });
+  }
+});
+
+// Download do contrato já gerado
+router.get('/vendas_carros/:vendaId/contracts/download', async (req, res) => {
+  try {
+    const { vendaId } = req.params;
+    const rows = await query('SELECT contratoPath FROM vendas_carros WHERE id = ? LIMIT 1', [vendaId]);
+    const contratoPath = rows[0]?.contratoPath;
+
+    if (!contratoPath) {
+      return res.status(404).json({ message: 'Contrato não encontrado para esta venda' });
+    }
+
+    const absolutePath = resolveSafeAbsolutePath(contratoPath);
+    if (!absolutePath || !fs.existsSync(absolutePath)) {
+      return res.status(404).json({ message: 'Arquivo de contrato não encontrado no servidor' });
+    }
+
+    return res.download(absolutePath, path.basename(absolutePath));
+  } catch (error) {
+    console.error('Erro ao baixar contrato de venda de carro:', error);
+    return res.status(500).json({ message: 'Erro ao baixar contrato', error: error.message });
+  }
+});
 
 /**
  * POST /api/contracts/generate
@@ -79,17 +258,11 @@ router.post('/contracts/generate', async (req, res) => {
     const nomeArquivo = `contrato_${cliente_id}_${veiculo_id}_${timestamp}.pdf`;
 
     // Criar diretório de contratos se não existir
-    const contractsDir = path.join(__dirname, '../../storage/uploads/contracts');
-    if (!fs.existsSync(contractsDir)) {
-      fs.mkdirSync(contractsDir, { recursive: true });
-    }
+    ensureContractsDir();
 
     // Salvar PDF se fornecido
-    const caminhoCompleto = path.join(contractsDir, nomeArquivo);
-    const caminhoRelativo = path.relative(
-      path.join(__dirname, '../../'),
-      caminhoCompleto
-    ).replace(/\\/g, '/');
+    const caminhoCompleto = path.join(CONTRACTS_DIR, nomeArquivo);
+    const caminhoRelativo = normalizeRelativeContractPath(caminhoCompleto);
 
     let fileSize = 0;
 

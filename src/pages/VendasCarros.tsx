@@ -33,6 +33,8 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import DescriptionIcon from '@mui/icons-material/Description';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useSearchParams } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatters';
 import HirataLogo from '../assets/Hirata Logo.svg';
@@ -58,6 +60,8 @@ interface VendaCarro {
   clienteEndereco?: string;
   reciboPDF?: string;
   reciboGeradoEm?: string;
+  contratoPath?: string;
+  contratoGeradoEm?: string;
 }
 
 interface VendaCarroFormData {
@@ -124,6 +128,7 @@ const VendasCarros = () => {
   const [clientes, setClientes] = useState<Array<{id: string; nome: string; telefone?: string; endereco?: string}>>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<{id: string; nome: string; telefone?: string; endereco?: string} | null>(null);
   const [configEmpresa, setConfigEmpresa] = useState<ConfiguracaoEmpresa>({});
+  const [idiomaContrato, setIdiomaContrato] = useState<'pt' | 'ja'>('pt');
 
   // Cálculo automático de valorTotal e valorParcela
   const valorBase = Number(formData.valor) || 0;
@@ -298,9 +303,17 @@ const VendasCarros = () => {
           console.error('Erro ao gerar recibo da venda de carro:', pdfError);
         }
 
+        try {
+          await axios.post(`/api/vendas_carros/${vendaCriada.id}/contracts/generate`, {
+            idioma: idiomaContrato,
+          });
+        } catch (contractError) {
+          console.error('Erro ao gerar contrato da venda de carro:', contractError);
+        }
+
         setSnackbar({
           open: true,
-          message: 'Venda de carro adicionada com sucesso e recibo PDF gerado',
+          message: 'Venda de carro adicionada com sucesso. Recibo e contrato processados.',
           severity: 'success'
         });
       }
@@ -557,6 +570,32 @@ const VendasCarros = () => {
                         </Box>
                       </TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                        {vendaCarro.contratoPath && (
+                          <>
+                            <IconButton
+                              color="secondary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`/api/vendas_carros/${vendaCarro.id}/contracts/view`, '_blank');
+                              }}
+                              size="small"
+                              title="Visualizar contrato"
+                            >
+                              <DescriptionIcon />
+                            </IconButton>
+                            <IconButton
+                              color="secondary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`/api/vendas_carros/${vendaCarro.id}/contracts/download`, '_blank');
+                              }}
+                              size="small"
+                              title="Baixar contrato"
+                            >
+                              <DownloadIcon />
+                            </IconButton>
+                          </>
+                        )}
                         <IconButton
                           color="primary"
                           onClick={(e) => { e.stopPropagation(); handleOpenForm(vendaCarro); }}
@@ -719,6 +758,19 @@ const VendasCarros = () => {
                 onChange={handleInputChange}
                 inputProps={{ min: 1 }}
               />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Idioma do Contrato</InputLabel>
+                <Select
+                  value={idiomaContrato}
+                  label="Idioma do Contrato"
+                  onChange={(e) => setIdiomaContrato(e.target.value as 'pt' | 'ja')}
+                >
+                  <MenuItem value="pt">Português</MenuItem>
+                  <MenuItem value="ja">Japonês</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12}>
               <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>

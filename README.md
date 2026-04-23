@@ -1,366 +1,282 @@
-# 🛠️ Oficina Mecânica - Sistema de Gestão Multilíngue
+# Oficina Mecânica | Workshop Management System
 
-## 📋 Sobre o Projeto
+![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.x-4479A1?logo=mysql&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-**Oficina Mecânica** é um sistema web completo de gestão para oficinas de conserto de veículos, desenvolvido com as mais modernas tecnologias web. O sistema oferece suporte completo a **4 idiomas** (Português, Vietnamita, Filipino e Japonês) com sincronização em tempo real em toda a interface.
+## ENGLISH
 
-### ✨ Características Principais
+## 1) Project Overview
 
-- 🌍 **Multilíngue Completo**: Interface 100% traduzida em 4 idiomas
-- 🛠️ **Gestão de Ordens de Serviço**: Criação, acompanhamento e conclusão de OS
-- 👥 **CRM de Clientes**: Sistema completo de gerenciamento de clientes
-- 🚗 **Registro de Veículos**: Cadastro detalhado de veículos com documentação
-- 📄 **Geração de Contratos**: Contratos de venda em formato PDF multilíngue
-- 📊 **Dashboard Inteligente**: Visualização de KPIs e métricas em tempo real
-- 💰 **Gestão Financeira**: Controle de vendas, recebíveis e faturamento
-- 🗃️ **Armazenamento de Documentos**: Upload e organização de documentação
-- 📱 **Responsivo**: Funciona perfeitamente em desktop, tablet e mobile
+Oficina Mecânica is a full-stack workshop/business management platform focused on:
 
----
+- Service Orders (`ordens_servico`)
+- Customers CRM (`clientes`, interactions, documents)
+- Vehicles management (`veiculos`)
+- Car sales management (`vendas_carros`, `vendas`, `parcelas`)
+- Contract generation and downloads (PDF)
+- Financial operations and reporting
+- Multilingual UI (`pt`, `vi`, `fil`, `ja`)
 
-## 🚀 Tecnologias Utilizadas
+### Architecture
 
-### Frontend
-- **React 18+** - Interface de usuário moderna
-- **TypeScript** - Tipagem estática para segurança
-- **Material-UI (MUI)** - Componentes UI profissionais
-- **Vite** - Build tool rápido e eficiente
-- **Axios** - Requisições HTTP
-- **html2pdf.js** - Geração de PDFs
+- Frontend: React + TypeScript + Vite + MUI
+- Backend: Node.js + Express + MySQL (`mysql2`)
+- Auth: Session-based authentication (`express-session`)
+- File handling: `multer`
+- Contract PDF generation (backend): `pdfkit`
 
-### Backend
-- **Node.js** - Runtime JavaScript
-- **Express.js** - Framework web
-- **MySQL** - Banco de dados relacional
-- **UUID** - Geração de IDs únicos
-- **Multer** - Upload de arquivos
+## 2) Repository Structure
 
-### DevOps
-- **Git** - Controle de versão
-- **NPM** - Gerenciador de pacotes
-- **Docker** (opcional) - Containerização
+- Root: frontend application and shared scripts
+- [backend/server.js](backend/server.js): main backend entrypoint
+- [backend/src/routes/contracts.js](backend/src/routes/contracts.js): contract/sales routes
+- [backend/src/config/database.js](backend/src/config/database.js): MySQL pool/query layer
+- [backend/src/config/env.js](backend/src/config/env.js): environment loader
+- [backend/schema.sql](backend/schema.sql) and [hirata_cars.sql](hirata_cars.sql): DB schema/data
 
----
+## 3) Step-by-Step Installation
 
-## 🌐 Suporte Multilíngue
+### Prerequisites
 
-O sistema detecta e muda automaticamente todos os textos da interface quando você seleciona um idioma diferente no menu. Os idiomas suportados são:
+1. Node.js 18+
+2. npm 9+
+3. MySQL 8+
+4. Git
 
-| Idioma | Código | Status |
-|--------|--------|--------|
-| 🇧🇷 Português | `pt` | ✅ Completo |
-| 🇻🇳 Vietnamita | `vi` | ✅ Completo |
-| 🇵🇭 Filipino | `fil` | ✅ Completo |
-| 🇯🇵 Japonês | `ja` | ✅ Completo |
+### Step 1 — Clone
 
-### Exemplos de Palavras Traduzidas
-
-```
-PORTUGUÊS    | VIETNAMITA      | FILIPINO        | JAPONÊS
--------------|-----------------|-----------------|------------------
-Clientes     | Khách hàng      | Mga Kliyente    | お客様
-Veículos     | Xe cộ           | Mga Sasakyan    | 車両
-Serviços     | Dịch vụ         | Mga Serbisyo    | サービス
-Documentos   | Tài liệu        | Mga Dokumento   | ドキュメント
-Gerar        | Tạo             | Lumikha         | 作成
-```
-
----
-
-## 📦 Instalação
-
-### Pré-requisitos
-- Node.js 16+ ou superior
-- NPM ou Yarn
-- MySQL 8+
-- Git
-
-### Frontend
 ```bash
-# Clonar o repositório
 git clone https://github.com/fvandrad/oficina-mecanica.git
 cd oficina-mecanica
+```
 
-# Instalar dependências
+### Step 2 — Install Frontend Dependencies (root)
+
+```bash
 npm install
+```
 
-# Iniciar servidor de desenvolvimento
+### Step 3 — Install Backend Dependencies
+
+```bash
+cd backend
+npm install
+cd ..
+```
+
+### Step 4 — Configure Backend Environment
+
+Create `backend/.env` with your values:
+
+```env
+NODE_ENV=development
+API_PORT=3001
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=hirata_cars
+SESSION_SECRET=change-this-secret
+DB_CONNECT_TIMEOUT=10000
+DB_QUERY_TIMEOUT=10000
+```
+
+### Step 5 — Create/Import Database
+
+Option A (full dump):
+
+```bash
+mysql -u root -p hirata_cars < hirata_cars.sql
+```
+
+Option B (schema only):
+
+```bash
+mysql -u root -p hirata_cars < backend/schema.sql
+```
+
+### Step 6 — Start Backend
+
+```bash
+cd backend
 npm run dev
+```
+
+### Step 7 — Start Frontend (new terminal)
+
+```bash
+npm run dev
+```
+
+Default local URLs:
+
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
+
+## 4) Useful Commands
+
+### Frontend (root)
+
+```bash
+npm run dev
+npm run build
+npm run lint
 ```
 
 ### Backend
+
 ```bash
 cd backend
+npm run dev
+npm run start
+npm run check
+```
 
-# Instalar dependências
+## 5) Security Notes
+
+- Session timeout middleware is enabled.
+- Protected API endpoints require active session.
+- Contract files are validated and resolved with safe server-side paths.
+- Input sanitization is used in frontend flows.
+
+---
+
+## PORTUGUÊS
+
+## 1) Sobre o Projeto
+
+O Oficina Mecânica é uma plataforma full-stack de gestão para oficina e vendas, com foco em:
+
+- Ordens de Serviço (`ordens_servico`)
+- CRM de clientes (`clientes`, interações, documentos)
+- Gestão de veículos (`veiculos`)
+- Gestão de vendas de carros (`vendas_carros`, `vendas`, `parcelas`)
+- Geração e download de contratos em PDF
+- Operação financeira e relatórios
+- Interface multilíngue (`pt`, `vi`, `fil`, `ja`)
+
+### Arquitetura
+
+- Frontend: React + TypeScript + Vite + MUI
+- Backend: Node.js + Express + MySQL (`mysql2`)
+- Autenticação: sessão (`express-session`)
+- Upload de arquivos: `multer`
+- Geração de contrato PDF (backend): `pdfkit`
+
+## 2) Estrutura do Repositório
+
+- Raiz: app frontend e scripts gerais
+- [backend/server.js](backend/server.js): ponto de entrada do backend
+- [backend/src/routes/contracts.js](backend/src/routes/contracts.js): rotas de contratos/vendas
+- [backend/src/config/database.js](backend/src/config/database.js): pool/query MySQL
+- [backend/src/config/env.js](backend/src/config/env.js): loader de variáveis de ambiente
+- [backend/schema.sql](backend/schema.sql) e [hirata_cars.sql](hirata_cars.sql): schema/dados do banco
+
+## 3) Instalação Passo a Passo
+
+### Pré-requisitos
+
+1. Node.js 18+
+2. npm 9+
+3. MySQL 8+
+4. Git
+
+### Passo 1 — Clonar
+
+```bash
+git clone https://github.com/fvandrad/oficina-mecanica.git
+cd oficina-mecanica
+```
+
+### Passo 2 — Instalar dependências do Frontend (raiz)
+
+```bash
 npm install
+```
 
-# Configurar arquivo .env
-cp .env.example .env
-# Editar .env com suas configurações de banco de dados
+### Passo 3 — Instalar dependências do Backend
 
-# Iniciar servidor
-npm start
-# ou com watch mode
+```bash
+cd backend
+npm install
+cd ..
+```
+
+### Passo 4 — Configurar ambiente do Backend
+
+Crie `backend/.env` com seus valores:
+
+```env
+NODE_ENV=development
+API_PORT=3001
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=sua_senha
+DB_NAME=hirata_cars
+SESSION_SECRET=troque-esta-chave
+DB_CONNECT_TIMEOUT=10000
+DB_QUERY_TIMEOUT=10000
+```
+
+### Passo 5 — Criar/Importar banco
+
+Opção A (dump completo):
+
+```bash
+mysql -u root -p hirata_cars < hirata_cars.sql
+```
+
+Opção B (somente schema):
+
+```bash
+mysql -u root -p hirata_cars < backend/schema.sql
+```
+
+### Passo 6 — Subir Backend
+
+```bash
+cd backend
 npm run dev
 ```
 
----
+### Passo 7 — Subir Frontend (novo terminal)
 
-## 🔧 Configuração
-
-### Variáveis de Ambiente (.env)
-
-**Frontend** (`root/.env.example`)
-```env
-VITE_API_URL=http://localhost:3001/api
-```
-
-**Backend** (`backend/.env.example`)
-```env
-NODE_ENV=development
-PORT=3001
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=sua_senha
-DB_NAME=oficina_mecanica
-SESSION_SECRET=sua_chave_secreta_segura
-```
-
-### Banco de Dados
 ```bash
-# Executar schema no MySQL
-mysql -u root -p oficina_mecanica < backend/schema.sql
+npm run dev
 ```
 
----
+URLs locais padrão:
 
-## 📱 Interface do Usuário
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
 
-### Dashboard Principal
-Visualize KPIs importantes:
-- Total de clientes
-- Total de veículos
-- Ordens em andamento
-- Faturamento total
-- Valores a receber
-- Últimas transações
+## 4) Comandos Úteis
 
-### Menu de Navegação
-- **OS** - Ordens de Serviço
-- **Clientes** - Gerenciamento de clientes
-- **Veículos** - Registro de veículos
-- **Serviços** - Cadastro de serviços
-- **Peças** - Catálogo de peças
-- **Vendas** - Vendas de carros
-- **Financeiro** - Gestão financeira
-- **Configurações** - Ajustes do sistema
+### Frontend (raiz)
 
----
-
-## 🎯 Funcionalidades Principais
-
-### 1️⃣ Gestão de Clientes
-- Cadastro completo com documentação
-- Upload de documentos (DNI, CNH, etc.)
-- Histórico de atendimentos (CRM)
-- Contatos e endereços
-
-### 2️⃣ Registro de Veículos
-- Cadastro de veículos associados a clientes
-- Documentação do veículo
-- Histórico de manutenção
-- Fotos e anotações
-
-### 3️⃣ Ordens de Serviço
-- Criação de OS com descrição
-- Acompanhamento de status
-- Cálculo de valores
-- Conclusão com relatório
-
-### 4️⃣ Geração de Contratos
-- Contratos de venda em PDF
-- Suporte a 4 idiomas
-- Cálculo automático de parcelas
-- Download direto do navegador
-
-### 5️⃣ Gestão Financeira
-- Controle de recebíveis
-- Status de pagamentos
-- Relatórios de faturamento
-- Integração com WhatsApp
-
----
-
-## 🔐 Segurança
-
-- ✅ Autenticação de usuários
-- ✅ Sessões com timeout de 1 hora
-- ✅ Proteção CSRF
-- ✅ CORS configurado
-- ✅ Validação de entrada
-- ✅ Sanitização de dados
-- ✅ Senhas criptografadas
-
----
-
-## 📊 Estrutura do Banco de Dados
-
-### Tabelas Principais
-- `usuarios` - Usuários do sistema
-- `clientes` - Dados de clientes
-- `veiculos` - Registro de veículos
-- `ordens_servico` - Ordens de serviço
-- `servicos` - Catálogo de serviços
-- `pecas` - Catálogo de peças
-- `vendas` - Vendas de carros
-- `client_documents` - Documentos e contratos
-- `empresas` - Configurações da empresa
-
----
-
-## 🚀 Deploy
-
-### Vercel (Frontend)
 ```bash
+npm run dev
 npm run build
-# Fazer push para GitHub
-git push origin main
-# Deploy automático via Vercel
+npm run lint
 ```
 
-### Heroku (Backend)
+### Backend
+
 ```bash
-heroku create oficina-mecanica-backend
-git push heroku main
+cd backend
+npm run dev
+npm run start
+npm run check
 ```
 
-### Docker (Opcional)
-```bash
-docker build -t oficina-mecanica .
-docker run -p 3000:3000 oficina-mecanica
-```
+## 5) Notas de Segurança
 
----
-
-## 🐛 Troubleshooting
-
-### Erro: "Conexão recusada no banco de dados"
-- Verificar se MySQL está rodando
-- Confirmar credenciais em `.env`
-- Executar schema do banco
-
-### Erro: "Idioma não muda na interface"
-- Verificar se `useLanguage()` está importado
-- Confirmar se `t()` está sendo chamado
-- Checar console para erros
-
-### Erro: "PDF não gera"
-- Verificar se html2pdf está instalado
-- Confirmar permissões de arquivo
-- Checar se dados estão corretos
-
----
-
-## 📝 API Documentation
-
-### Endpoints Principais
-
-#### Clientes
-```
-GET    /api/clientes           - Listar clientes
-POST   /api/clientes           - Criar cliente
-PUT    /api/clientes/:id       - Atualizar cliente
-DELETE /api/clientes/:id       - Deletar cliente
-```
-
-#### Veículos
-```
-GET    /api/veiculos           - Listar veículos
-POST   /api/veiculos           - Criar veículo
-PUT    /api/veiculos/:id       - Atualizar veículo
-DELETE /api/veiculos/:id       - Deletar veículo
-```
-
-#### Contratos
-```
-POST   /api/contracts/generate - Gerar contrato
-GET    /api/contracts/:id      - Obter contrato
-GET    /api/clients/:id/contracts - Listar contratos do cliente
-DELETE /api/contracts/:id      - Deletar contrato
-```
-
-#### Documentos
-```
-GET    /api/clients/:id/documents - Listar documentos
-POST   /api/clients/:id/documents - Upload de documento
-DELETE /api/clients/:id/documents/:docId - Deletar documento
-```
-
----
-
-## 📞 Suporte
-
-Para reportar bugs ou sugerir features:
-- 📧 Email: support@oficinamecanica.com
-- 🐙 GitHub Issues: [GitHub](https://github.com/fvandrad/oficina-mecanica/issues)
-- 💬 Discord: [Discord Server](https://discord.gg/oficinamecanica)
-
----
-
-## 📄 Licença
-
-MIT License - veja [LICENSE](LICENSE) para detalhes
-
----
-
-## 👥 Contribuidores
-
-- **Fernando Vandrad** (@fvandrad) - Desenvolvedor Principal
-- **GitHub Copilot** - Assistência em desenvolvimento
-
----
-
-## 🎓 Aprendizados
-
-Este projeto demonstra:
-- ✅ Arquitetura Full Stack moderna
-- ✅ Internacionalização (i18n) completa
-- ✅ Padrões de design em React
-- ✅ Integração Frontend-Backend
-- ✅ Gestão de estado com Context API
-- ✅ Geração de PDF dinâmico
-- ✅ Autenticação e autorização
-- ✅ Boas práticas de código
-
----
-
-## 🎉 Status do Projeto
-
-| Componente | Status | Progresso |
-|-----------|--------|-----------|
-| Frontend | ✅ Completo | 100% |
-| Backend | ✅ Completo | 100% |
-| Banco de Dados | ✅ Completo | 100% |
-| Testes | ⚠️ Parcial | 60% |
-| Deploy | ⚠️ Planejado | 0% |
-| Documentação | ✅ Completo | 100% |
-
----
-
-## 🚀 Roadmap Futuro
-
-- [ ] Testes E2E com Cypress
-- [ ] App Mobile com React Native
-- [ ] Sistema de notificações
-- [ ] Integração com WhatsApp Business API
-- [ ] Relatórios avançados com gráficos
-- [ ] Sistema de backup automático
-- [ ] Integração com sistemas de pagamento
-- [ ] Suporte para mais idiomas
-
----
-
-**Feito com ❤️ para oficinas de conserto de veículos**
-
-Versão: 1.0.0 | Última atualização: 17 de abril de 2026
+- Timeout de sessão ativo.
+- Endpoints protegidos exigem sessão ativa.
+- Arquivos de contrato são resolvidos com caminhos seguros no servidor.
+- Sanitização de entrada aplicada nos fluxos do frontend.
