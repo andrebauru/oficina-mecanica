@@ -27,8 +27,8 @@ const env = {
     connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT || 10000),
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
-    queryTimeout: Number(process.env.DB_QUERY_TIMEOUT || 10000),
   },
+  dbQueryTimeout: Number(process.env.DB_QUERY_TIMEOUT || 10000),
   sessionSecret: required('SESSION_SECRET', 'troque-por-uma-chave-forte'),
 };
 

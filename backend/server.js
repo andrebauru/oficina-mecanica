@@ -5,12 +5,6 @@ const crypto = require('crypto');
 const env = require('./src/config/env');
 const { testConnection, query, normalizeDatabaseError } = require('./src/config/database');
 const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout');
-const {
-  collectionConfig,
-  toDatabaseRecord,
-  toClientRecord,
-  allowedFilterMap,
-} = require('./src/config/entities');
 const clientCrmRouter = require('./src/routes/clientCrm');
 const contractsRouter = require('./src/routes/contracts');
 
@@ -45,6 +39,421 @@ function upgradePasswordHash(senha) {
   const salt = crypto.randomBytes(16).toString('hex');
   const digest = crypto.createHash('sha256').update(`${salt}:${senha}`).digest('hex');
   return `sha256:${salt}:${digest}`;
+}
+
+let cachedUserPasswordColumn = null;
+async function resolveUserPasswordColumn() {
+  if (cachedUserPasswordColumn) return cachedUserPasswordColumn;
+
+  const rows = await query(
+    `SELECT COLUMN_NAME
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'usuarios'
+       AND COLUMN_NAME IN ('senha_hash', 'senha')
+     ORDER BY FIELD(COLUMN_NAME, 'senha_hash', 'senha')`
+  );
+
+  const passwordColumn = rows[0]?.COLUMN_NAME;
+  if (!passwordColumn) {
+    const error = new Error("Tabela 'usuarios' sem coluna de senha válida (esperado: senha_hash ou senha).");
+    error.statusCode = 500;
+    throw error;
+  }
+
+  cachedUserPasswordColumn = passwordColumn;
+  return cachedUserPasswordColumn;
+}
+
+const ENTITY_ROUTES = {
+  configuracoes: {
+    table: 'configuracoes',
+    idColumn: 'id',
+    idPrefix: 'cfg',
+    fields: {
+      id: 'id',
+      senhaHash: 'senha_hash',
+      nomeEmpresa: 'nome_empresa',
+      endereco: 'endereco',
+      telefone: 'telefone',
+      numeroAutorizacao: 'numero_autorizacao',
+    },
+    sensitiveFields: ['senhaHash'],
+  },
+  usuarios: {
+    table: 'usuarios',
+    idColumn: 'id',
+    idPrefix: 'usr',
+    fields: {
+      id: 'id',
+      nome: 'nome',
+      email: 'email',
+      idioma: 'idioma',
+    },
+  },
+  clientes: {
+    table: 'clientes',
+    idColumn: 'id',
+    idPrefix: 'cli',
+    fields: {
+      id: 'id',
+      nome: 'nome',
+      email: 'email',
+      telefone: 'telefone',
+      endereco: 'endereco',
+      cnh_number: 'cnh_number',
+      observacoes_gerais: 'observacoes_gerais',
+    },
+  },
+  veiculos: {
+    table: 'veiculos',
+    idColumn: 'id',
+    idPrefix: 'vei',
+    fields: {
+      id: 'id',
+      clienteId: 'cliente_id',
+      marca: 'marca',
+      modelo: 'modelo',
+      ano: 'ano',
+      placa: 'placa',
+      chassi: 'chassi',
+      kilometragem: 'kilometragem',
+      data_venda: 'data_venda',
+      nova_placa: 'nova_placa',
+      data_transferencia: 'data_transferencia',
+    },
+  },
+  servicos: {
+    table: 'servicos',
+    idColumn: 'id',
+    idPrefix: 'srv',
+    fields: {
+      id: 'id',
+      nome: 'nome',
+      descricao: 'descricao',
+      valor: 'valor',
+      tempoEstimado: 'tempo_estimado',
+    },
+  },
+  pecas: {
+    table: 'pecas',
+    idColumn: 'id',
+    idPrefix: 'pec',
+    fields: {
+      id: 'id',
+      nome: 'nome',
+      codigo: 'codigo',
+      marca: 'marca',
+      modeloCompativel: 'modelo_compativel',
+      preco: 'preco',
+      quantidade: 'quantidade',
+    },
+  },
+  ordens_servico: {
+    table: 'ordens_servico',
+    idColumn: 'id',
+    idPrefix: 'os',
+    fields: {
+      id: 'id',
+      veiculoId: 'veiculo_id',
+      clienteId: 'cliente_id',
+      dataEntrada: 'data_entrada',
+      dataSaida: 'data_saida',
+      status: 'status',
+      descricao: 'descricao',
+      servicosIds: 'servicos_ids_json',
+      pecasIds: 'pecas_ids_json',
+      valorTotal: 'valor_total',
+      valorBase: 'valor_base',
+      parcelas: 'parcelas',
+      juros: 'juros',
+      parcelasStatus: 'parcelas_status_json',
+    },
+    jsonFields: ['servicosIds', 'pecasIds', 'parcelasStatus'],
+  },
+  vendas_carros: {
+    table: 'vendas_carros',
+    idColumn: 'id',
+    idPrefix: 'vc',
+    fields: {
+      id: 'id',
+      clienteId: 'cliente_id',
+      clienteNome: 'cliente_nome',
+      clienteTelefone: 'cliente_telefone',
+      clienteEndereco: 'cliente_endereco',
+      valor: 'valor',
+      valorPago: 'valor_pago',
+      fabricante: 'fabricante',
+      modelo: 'modelo',
+      ano: 'ano',
+      kilometragem: 'kilometragem',
+      parcelas: 'parcelas',
+      juros: 'juros',
+      valorTotal: 'valor_total',
+      parcelasStatus: 'parcelas_status_json',
+      reciboPDF: 'recibo_pdf',
+      reciboGeradoEm: 'recibo_gerado_em',
+    },
+    jsonFields: ['parcelasStatus'],
+  },
+  financeiro: {
+    table: 'financeiro',
+    idColumn: 'id',
+    idPrefix: 'fin',
+    fields: {
+      id: 'id',
+      data: 'data',
+      categoria: 'categoria',
+      tipo: 'tipo',
+      valor: 'valor',
+      descricao: 'descricao',
+      categoriaId: 'categoria_id',
+    },
+  },
+  categorias_financeiro: {
+    table: 'categorias_financeiro',
+    idColumn: 'id',
+    idPrefix: 'cat',
+    fields: {
+      id: 'id',
+      nome: 'nome',
+      tipo: 'tipo',
+    },
+  },
+  documentos: {
+    table: 'documentos',
+    idColumn: 'id',
+    idPrefix: 'doc',
+    fields: {
+      id: 'id',
+      entityId: 'entity_id',
+      entityType: 'entity_type',
+      base64: 'base64',
+      filename: 'filename',
+      anotacao: 'anotacao',
+      categoria: 'categoria',
+      referenciaId: 'referencia_id',
+      referenciaTipo: 'referencia_tipo',
+      arquivoOriginal: 'arquivo_original',
+      dataUpload: 'data_upload',
+    },
+  },
+  vendas: {
+    table: 'vendas',
+    idColumn: 'id',
+    idPrefix: 'v',
+    fields: {
+      id: 'id',
+      clienteId: 'cliente_id',
+      veiculoId: 'veiculo_id',
+      clienteNomeSnapshot: 'cliente_nome_snapshot',
+      clienteTelefoneSnapshot: 'cliente_telefone_snapshot',
+      clienteEnderecoSnapshot: 'cliente_endereco_snapshot',
+      dataVenda: 'data_venda',
+      valorTotal: 'valor_total',
+      valorPago: 'valor_pago',
+      tipoVenda: 'tipo_venda',
+      numeroParcelas: 'numero_parcelas',
+      juros: 'juros',
+      statusVenda: 'status_venda',
+      foroPagamento: 'foro_pagamento',
+      nomeContrato: 'nome_contrato',
+      placa: 'placa',
+      chassi: 'chassi',
+      dataQuitar: 'data_quitar',
+      reciboPDF: 'recibo_pdf',
+      reciboGeradoEm: 'recibo_gerado_em',
+      observacoes: 'observacoes',
+    },
+  },
+  parcelas: {
+    table: 'parcelas',
+    idColumn: 'id',
+    idPrefix: 'par',
+    fields: {
+      id: 'id',
+      vendaId: 'venda_id',
+      numeroParcela: 'numero_parcela',
+      valor: 'valor',
+      dataVencimento: 'data_vencimento',
+      status: 'status',
+      dataPagamento: 'data_pagamento',
+      clienteNome: 'cliente_nome',
+      clienteTelefone: 'cliente_telefone',
+    },
+  },
+  agendamentos: {
+    table: 'agendamentos',
+    idColumn: 'id',
+    idPrefix: 'agd',
+    fields: {
+      id: 'id',
+      clienteId: 'cliente_id',
+      veiculoId: 'veiculo_id',
+      titulo: 'titulo',
+      descricao: 'descricao',
+      dataAgendamento: 'data_agendamento',
+      status: 'status',
+    },
+  },
+};
+
+function generateId(prefix = 'id') {
+  return `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
+}
+
+function parseDbRow(entityDef, row) {
+  const parsed = {};
+  for (const clientKey of Object.keys(entityDef.fields)) {
+    if (!(clientKey in row)) continue;
+    const value = row[clientKey];
+    if ((entityDef.jsonFields || []).includes(clientKey)) {
+      if (value == null || value === '') {
+        parsed[clientKey] = [];
+      } else if (Array.isArray(value)) {
+        parsed[clientKey] = value;
+      } else {
+        try {
+          parsed[clientKey] = JSON.parse(value);
+        } catch {
+          parsed[clientKey] = [];
+        }
+      }
+      continue;
+    }
+    parsed[clientKey] = value;
+  }
+  return parsed;
+}
+
+function toDbPayload(entityDef, payload, { includeId = true } = {}) {
+  const dbPayload = {};
+  for (const [clientKey, dbKey] of Object.entries(entityDef.fields)) {
+    if (!includeId && clientKey === 'id') continue;
+    if (payload[clientKey] === undefined) continue;
+
+    if ((entityDef.jsonFields || []).includes(clientKey)) {
+      dbPayload[dbKey] = payload[clientKey] == null ? null : JSON.stringify(payload[clientKey]);
+    } else {
+      dbPayload[dbKey] = payload[clientKey];
+    }
+  }
+  return dbPayload;
+}
+
+function selectColumns(entityDef, { includeSensitive = false } = {}) {
+  return Object.entries(entityDef.fields)
+    .filter(([clientKey]) => includeSensitive || !(entityDef.sensitiveFields || []).includes(clientKey))
+    .map(([clientKey, dbKey]) => `${dbKey} AS ${clientKey}`)
+    .join(', ');
+}
+
+function filterToWhere(entityDef, queryParams) {
+  const filters = [];
+  const params = [];
+  for (const [key, value] of Object.entries(queryParams || {})) {
+    if (value === undefined || value === null || value === '') continue;
+    const dbKey = entityDef.fields[key];
+    if (!dbKey) continue;
+    filters.push(`${dbKey} = ?`);
+    params.push(String(value));
+  }
+  return {
+    whereClause: filters.length ? ` WHERE ${filters.join(' AND ')}` : '',
+    params,
+  };
+}
+
+async function getEntityById(resource, id, { includeSensitive = false } = {}) {
+  const entityDef = ENTITY_ROUTES[resource];
+  const columns = selectColumns(entityDef, { includeSensitive });
+  const rows = await query(
+    `SELECT ${columns} FROM ${entityDef.table} WHERE ${entityDef.idColumn} = ? LIMIT 1`,
+    [id]
+  );
+  return rows[0] ? parseDbRow(entityDef, rows[0]) : null;
+}
+
+function registerEntityRoutes(resource, entityDef) {
+  const basePath = `/api/${resource}`;
+
+  app.get(basePath, safeRoute(async (req, res) => {
+    const columns = selectColumns(entityDef);
+    const { whereClause, params } = filterToWhere(entityDef, req.query);
+    const rows = await query(
+      `SELECT ${columns} FROM ${entityDef.table}${whereClause} ORDER BY ${entityDef.idColumn} ASC`,
+      params
+    );
+    return res.json(rows.map(row => parseDbRow(entityDef, row)));
+  }));
+
+  app.get(`${basePath}/:id`, safeRoute(async (req, res) => {
+    const found = await getEntityById(resource, req.params.id);
+    if (!found) return res.status(404).json({ message: 'Registro não encontrado' });
+    return res.json(found);
+  }));
+
+  app.post(basePath, safeRoute(async (req, res) => {
+    const dbPayload = toDbPayload(entityDef, req.body || {});
+    if (!dbPayload[entityDef.idColumn]) {
+      dbPayload[entityDef.idColumn] = generateId(entityDef.idPrefix);
+    }
+
+    const columns = Object.keys(dbPayload);
+    const values = Object.values(dbPayload);
+    const placeholders = columns.map(() => '?').join(', ');
+
+    await query(
+      `INSERT INTO ${entityDef.table} (${columns.join(', ')}) VALUES (${placeholders})`,
+      values
+    );
+
+    const created = await getEntityById(resource, dbPayload[entityDef.idColumn]);
+    return res.status(201).json(created);
+  }));
+
+  app.put(`${basePath}/:id`, safeRoute(async (req, res) => {
+    const current = await getEntityById(resource, req.params.id, { includeSensitive: true });
+    if (!current) return res.status(404).json({ message: 'Registro não encontrado' });
+
+    const merged = { ...current, ...(req.body || {}), id: req.params.id };
+    const dbPayload = toDbPayload(entityDef, merged);
+    const updateCols = Object.keys(dbPayload).filter(col => col !== entityDef.idColumn);
+
+    if (updateCols.length === 0) return res.json(current);
+
+    const updateSql = updateCols.map(col => `${col} = ?`).join(', ');
+    const params = [...updateCols.map(col => dbPayload[col]), req.params.id];
+
+    await query(`UPDATE ${entityDef.table} SET ${updateSql} WHERE ${entityDef.idColumn} = ?`, params);
+    const updated = await getEntityById(resource, req.params.id);
+    return res.json(updated);
+  }));
+
+  app.patch(`${basePath}/:id`, safeRoute(async (req, res) => {
+    const current = await getEntityById(resource, req.params.id, { includeSensitive: true });
+    if (!current) return res.status(404).json({ message: 'Registro não encontrado' });
+
+    const dbPayload = toDbPayload(entityDef, req.body || {}, { includeId: false });
+    const updateCols = Object.keys(dbPayload);
+
+    if (updateCols.length === 0) return res.json(await getEntityById(resource, req.params.id));
+
+    const updateSql = updateCols.map(col => `${col} = ?`).join(', ');
+    const params = [...updateCols.map(col => dbPayload[col]), req.params.id];
+
+    await query(`UPDATE ${entityDef.table} SET ${updateSql} WHERE ${entityDef.idColumn} = ?`, params);
+    const updated = await getEntityById(resource, req.params.id);
+    return res.json(updated);
+  }));
+
+  app.delete(`${basePath}/:id`, safeRoute(async (req, res) => {
+    const existing = await getEntityById(resource, req.params.id, { includeSensitive: true });
+    if (!existing) return res.status(404).json({ message: 'Registro não encontrado' });
+
+    await query(`DELETE FROM ${entityDef.table} WHERE ${entityDef.idColumn} = ?`, [req.params.id]);
+    return res.status(204).send();
+  }));
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -140,14 +549,17 @@ app.get('/api/auth/status', safeRoute(async (req, res) => {
 }));
 
 app.post('/api/auth/login', safeRoute(async (req, res) => {
-  const { nome, senha } = req.body || {};
-  if (!nome || !senha) {
-    return sendAuthError(res, 400, 'Nome e senha são obrigatórios.');
+  const { email, senha } = req.body || {};
+  const loginEmail = String(email || '').trim();
+  if (!loginEmail || !senha) {
+    return sendAuthError(res, 400, 'Email e senha são obrigatórios.');
   }
 
+  const passwordColumn = await resolveUserPasswordColumn();
+
   const rows = await query(
-    'SELECT id, nome, email, idioma, senha_hash AS senhaHash FROM usuarios WHERE nome = ? LIMIT 1',
-    [nome]
+    `SELECT id, nome, email, idioma, ${passwordColumn} AS senhaHash FROM usuarios WHERE email = ? LIMIT 1`,
+    [loginEmail]
   );
   const user = rows[0];
   if (!user) {
@@ -160,7 +572,7 @@ app.post('/api/auth/login', safeRoute(async (req, res) => {
   // Auto-upgrade de hash legado para sha256
   if (user.senhaHash && !user.senhaHash.startsWith('sha256:')) {
     const newHash = upgradePasswordHash(senha);
-    await query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [newHash, user.id]).catch(() => {});
+    await query(`UPDATE usuarios SET ${passwordColumn} = ? WHERE id = ?`, [newHash, user.id]).catch(() => {});
   }
 
   req.session.user = {
@@ -180,6 +592,7 @@ app.post('/api/auth/setup', safeRoute(async (req, res) => {
   if (!nome || !senha) {
     return sendAuthError(res, 400, 'Nome e senha são obrigatórios.');
   }
+  const passwordColumn = await resolveUserPasswordColumn();
   const existingUsers = await query('SELECT id FROM usuarios LIMIT 1');
   if (existingUsers.length > 0) {
     return sendAuthError(res, 403, 'Já existe um usuário cadastrado. Use o login normal.');
@@ -189,7 +602,7 @@ app.post('/api/auth/setup', safeRoute(async (req, res) => {
   const senhaHash = `sha256:${salt}:${digest}`;
   const newId = `usr${Date.now()}${Math.floor(Math.random() * 1000)}`;
   await query(
-    'INSERT INTO usuarios (id, nome, email, idioma, senha_hash) VALUES (?, ?, ?, ?, ?)',
+    `INSERT INTO usuarios (id, nome, email, idioma, ${passwordColumn}) VALUES (?, ?, ?, ?, ?)`,
     [newId, nome.trim(), '', 'pt', senhaHash]
   );
   req.session.user = { id: newId, nome: nome.trim(), email: '', idioma: 'pt' };
@@ -217,137 +630,25 @@ app.post('/api/auth/change-password', safeRoute(async (req, res) => {
     return sendAuthError(res, 400, 'Senha atual e nova senha são obrigatórias.');
   }
 
-  const rows = await query('SELECT id, senha_hash AS senhaHash FROM usuarios WHERE id = ? LIMIT 1', [userId]);
+  const passwordColumn = await resolveUserPasswordColumn();
+
+  const rows = await query(
+    `SELECT id, ${passwordColumn} AS senhaHash FROM usuarios WHERE id = ? LIMIT 1`,
+    [userId]
+  );
   const user = rows[0];
   if (!user || !verifyPassword(senhaAtual, user.senhaHash)) {
     return sendAuthError(res, 401, 'Senha atual incorreta.');
   }
 
   const newHash = upgradePasswordHash(novaSenha);
-  await query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [newHash, userId]);
+  await query(`UPDATE usuarios SET ${passwordColumn} = ? WHERE id = ?`, [newHash, userId]);
   return res.json({ success: true });
 }));
 
-const editableCollections = Object.keys(collectionConfig);
-
-async function findById(collectionName, id) {
-  const entity = collectionConfig[collectionName];
-  const rows = await query(`SELECT * FROM ${entity.table} WHERE ${entity.idField} = ? LIMIT 1`, [id]);
-  return rows[0] ? toClientRecord(collectionName, rows[0]) : null;
-}
-
-app.get('/api/:collection', safeRoute(async (req, res) => {
-  const { collection } = req.params;
-  if (!editableCollections.includes(collection)) {
-    return res.status(404).json({ message: 'Coleção não encontrada' });
-  }
-
-  const entity = collectionConfig[collection];
-  const filters = [];
-  const params = [];
-  const fieldMap = allowedFilterMap(collection);
-
-  for (const [key, value] of Object.entries(req.query)) {
-    if (value === undefined || value === null || value === '') continue;
-    const dbKey = fieldMap[key];
-    if (!dbKey) continue;
-    filters.push(`${dbKey} = ?`);
-    params.push(String(value));
-  }
-
-  const whereClause = filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
-  const rows = await query(`SELECT * FROM ${entity.table}${whereClause} ORDER BY ${entity.idField} ASC`, params);
-  return res.json(rows.map(row => toClientRecord(collection, row)));
-}));
-
-app.get('/api/:collection/:id', safeRoute(async (req, res) => {
-  const { collection, id } = req.params;
-  if (!editableCollections.includes(collection)) {
-    return res.status(404).json({ message: 'Coleção não encontrada' });
-  }
-
-  const found = await findById(collection, id);
-  if (!found) return res.status(404).json({ message: 'Registro não encontrado' });
-  return res.json(found);
-}));
-
-app.post('/api/:collection', safeRoute(async (req, res) => {
-  const { collection } = req.params;
-  if (!editableCollections.includes(collection)) {
-    return res.status(404).json({ message: 'Coleção não encontrada' });
-  }
-
-  const entity = collectionConfig[collection];
-  const dbRecord = toDatabaseRecord(collection, req.body || {});
-  const columns = Object.keys(dbRecord);
-  const placeholders = columns.map(() => '?').join(', ');
-  const values = columns.map(c => dbRecord[c]);
-
-  await query(
-    `INSERT INTO ${entity.table} (${columns.join(', ')}) VALUES (${placeholders})`,
-    values
-  );
-
-  const created = await findById(collection, dbRecord[entity.idField]);
-  return res.status(201).json(created);
-}));
-
-app.put('/api/:collection/:id', safeRoute(async (req, res) => {
-  const { collection, id } = req.params;
-  if (!editableCollections.includes(collection)) {
-    return res.status(404).json({ message: 'Coleção não encontrada' });
-  }
-
-  const current = await findById(collection, id);
-  if (!current) return res.status(404).json({ message: 'Registro não encontrado' });
-
-  const merged = { ...current, ...(req.body || {}), id };
-  const entity = collectionConfig[collection];
-  const dbRecord = toDatabaseRecord(collection, merged);
-
-  const updateColumns = Object.keys(dbRecord).filter(c => c !== entity.idField);
-  const updateSql = updateColumns.map(c => `${c} = ?`).join(', ');
-  const params = [...updateColumns.map(c => dbRecord[c]), id];
-
-  await query(`UPDATE ${entity.table} SET ${updateSql} WHERE ${entity.idField} = ?`, params);
-  const updated = await findById(collection, id);
-  return res.json(updated);
-}));
-
-app.patch('/api/:collection/:id', safeRoute(async (req, res) => {
-  const { collection, id } = req.params;
-  if (!editableCollections.includes(collection)) {
-    return res.status(404).json({ message: 'Coleção não encontrada' });
-  }
-
-  const current = await findById(collection, id);
-  if (!current) return res.status(404).json({ message: 'Registro não encontrado' });
-
-  const partial = { ...current, ...(req.body || {}), id };
-  const entity = collectionConfig[collection];
-  const dbRecord = toDatabaseRecord(collection, partial);
-  const updateColumns = Object.keys(dbRecord).filter(c => c !== entity.idField);
-  const updateSql = updateColumns.map(c => `${c} = ?`).join(', ');
-  const params = [...updateColumns.map(c => dbRecord[c]), id];
-
-  await query(`UPDATE ${entity.table} SET ${updateSql} WHERE ${entity.idField} = ?`, params);
-  const updated = await findById(collection, id);
-  return res.json(updated);
-}));
-
-app.delete('/api/:collection/:id', safeRoute(async (req, res) => {
-  const { collection, id } = req.params;
-  if (!editableCollections.includes(collection)) {
-    return res.status(404).json({ message: 'Coleção não encontrada' });
-  }
-
-  const entity = collectionConfig[collection];
-  const existing = await findById(collection, id);
-  if (!existing) return res.status(404).json({ message: 'Registro não encontrado' });
-
-  await query(`DELETE FROM ${entity.table} WHERE ${entity.idField} = ?`, [id]);
-  return res.status(204).send();
-}));
+Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
+  registerEntityRoutes(resource, entityDef);
+});
 
 app.use((error, _req, res, _next) => {
   const normalized = normalizeDatabaseError(error);

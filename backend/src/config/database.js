@@ -32,7 +32,7 @@ async function query(sql, params = []) {
   try {
     const [rows] = await pool.execute({
       sql,
-      timeout: env.db.queryTimeout,
+      timeout: env.dbQueryTimeout,
     }, params);
     return rows;
   } catch (error) {
