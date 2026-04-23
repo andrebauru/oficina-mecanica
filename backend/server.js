@@ -51,12 +51,15 @@ function upgradePasswordHash(senha) {
 const app = express();
 
 app.use(cors({
-  origin: (origin, callback) => callback(null, origin || true),
+  origin: (origin, callback) => callback(null, origin || 'http://localhost:5173'),
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
   exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200,
 }));
 app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(session({
   secret: env.sessionSecret,
   resave: false,
@@ -72,7 +75,7 @@ app.use(session({
 app.use(sessionTimeout);
 
 // Middleware de autenticação: bloqueia mutações sem sessão ativa
-const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/session', '/api/health'];
+const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/auth/setup', '/api/session', '/api/health'];
 function requireAuth(req, res, next) {
   if (req.method === 'GET') return next();
   if (AUTH_PUBLIC_PATHS.some(p => req.path === p)) return next();
@@ -135,6 +138,34 @@ app.post('/api/auth/login', async (req, res) => {
   req.session.lastActivity = Date.now();
 
   return res.json({ authenticated: true, user: req.session.user, expiresInMs: ONE_HOUR_MS });
+});
+
+// Endpoint público de setup inicial: cria o primeiro usuário (bloqueado se já existirem usuários)
+app.post('/api/auth/setup', async (req, res) => {
+  try {
+    const { nome, senha } = req.body || {};
+    if (!nome || !senha) {
+      return res.status(400).json({ message: 'Nome e senha são obrigatórios' });
+    }
+    const existingUsers = await query('SELECT id FROM usuarios LIMIT 1');
+    if (existingUsers.length > 0) {
+      return res.status(403).json({ message: 'Já existe um usuário cadastrado. Use o login normal.' });
+    }
+    const salt = crypto.randomBytes(16).toString('hex');
+    const digest = crypto.createHash('sha256').update(`${salt}:${senha}`).digest('hex');
+    const senhaHash = `sha256:${salt}:${digest}`;
+    const newId = `usr${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    await query(
+      'INSERT INTO usuarios (id, nome, email, idioma, senha_hash) VALUES (?, ?, ?, ?, ?)',
+      [newId, nome.trim(), '', 'pt', senhaHash]
+    );
+    req.session.user = { id: newId, nome: nome.trim(), email: '', idioma: 'pt' };
+    req.session.lastActivity = Date.now();
+    return res.status(201).json({ authenticated: true, user: req.session.user, expiresInMs: ONE_HOUR_MS });
+  } catch (error) {
+    console.error('[setup] Erro:', error);
+    return res.status(500).json({ message: 'Erro ao criar usuário inicial', error: error.message });
+  }
 });
 
 app.post('/api/auth/logout', (req, res) => {

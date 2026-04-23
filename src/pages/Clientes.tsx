@@ -81,8 +81,6 @@ const Clientes = () => {
   const [docsCliente, setDocsCliente] = useState<{ id: string; nome: string } | null>(null);
   const [openCrm, setOpenCrm] = useState(false);
   const [crmCliente, setCrmCliente] = useState<{ id: string; nome: string } | null>(null);
-  const [uploadingDocument, setUploadingDocument] = useState(false);
-  const [documentsClienteId, setDocumentsClienteId] = useState<string | null>(null);
   const [openContratoVenda, setOpenContratoVenda] = useState(false);
   const [contratoVendaCliente, setContratoVendaCliente] = useState<{ id: string; nome: string } | null>(null);
 
@@ -128,11 +126,9 @@ const Clientes = () => {
         observacoes_gerais: cliente.observacoes_gerais || ''
       });
       setEditingId(cliente.id);
-      setDocumentsClienteId(cliente.id);
     } else {
       setFormData(clienteVazio);
       setEditingId(null);
-      setDocumentsClienteId(null);
     }
     setOpenForm(true);
   };
@@ -255,8 +251,10 @@ const Clientes = () => {
     if (ordenacao.campo !== '') {
       const campoOrdenacao = ordenacao.campo as keyof Cliente;
       resultado = [...resultado].sort((a, b) => {
-        if (a[campoOrdenacao] < b[campoOrdenacao]) return ordenacao.direcao === 'asc' ? -1 : 1;
-        if (a[campoOrdenacao] > b[campoOrdenacao]) return ordenacao.direcao === 'asc' ? 1 : -1;
+        const valorA = a[campoOrdenacao] ?? '';
+        const valorB = b[campoOrdenacao] ?? '';
+        if (valorA < valorB) return ordenacao.direcao === 'asc' ? -1 : 1;
+        if (valorA > valorB) return ordenacao.direcao === 'asc' ? 1 : -1;
         return 0;
       });
     }

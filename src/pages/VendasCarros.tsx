@@ -38,6 +38,7 @@ import { formatCurrency } from '../utils/formatters';
 import HirataLogo from '../assets/Hirata Logo.svg';
 import { baixarReciboVendaPDF, gerarReciboVendaImagem, gerarReciboVendaPDF } from '../utils/gerarReciboVendaPDF';
 import { sanitizeMultilineText, sanitizeNumber, sanitizeText } from '../utils/security';
+import { useLanguage } from '../components/LanguageContext';
 
 interface VendaCarro {
   id: number;
@@ -79,6 +80,7 @@ interface ConfiguracaoEmpresa {
   numeroAutorizacao?: string;
 }
 
+
 const vendaCarroVazio: VendaCarroFormData = {
   valor: '',
   valorPago: '',
@@ -93,6 +95,7 @@ const vendaCarroVazio: VendaCarroFormData = {
 };
 
 const VendasCarros = () => {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');
   const highlightRef = useRef<HTMLTableRowElement | null>(null);

@@ -42,6 +42,7 @@ import 'dayjs/locale/pt-br';
 import dayjs, { Dayjs } from 'dayjs';
 import { formatCurrency } from '../utils/formatters'; // Importar a função de formatação de moeda
 import HirataLogo from '../assets/Hirata Logo.svg';
+import { useLanguage } from '../components/LanguageContext';
 
 interface OrdemServico {
   id: string;
@@ -57,6 +58,7 @@ interface OrdemServico {
   juros?: number;
   parcelasStatus?: boolean[];
 }
+
 
 interface Veiculo {
   id: string;
@@ -129,6 +131,7 @@ const ordemVazia: OrdemServicoFormData = {
 };
 
 const OrdensServico = () => {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get('highlight');
   const highlightRef = useRef<HTMLTableRowElement | null>(null);

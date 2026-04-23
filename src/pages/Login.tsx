@@ -12,7 +12,6 @@ import {
 import LockIcon from '@mui/icons-material/Lock';
 import HirataLogo from '../assets/Hirata Logo.svg';
 import { useLanguage } from '../components/LanguageContext';
-import { hashPassword } from '../utils/security';
 import { startSession } from '../utils/session';
 
 interface LoginProps {
@@ -47,13 +46,11 @@ const Login = ({ onLogin }: LoginProps) => {
         if (senha !== confirmar) { setErro(t('senhasNaoConferem')); setSalvando(false); return; }
         if (senha.length < 4) { setErro(t('senhaMinima')); setSalvando(false); return; }
 
-        // Cria o primeiro usuário com hash gerado client-side
-        await axios.post('/api/usuarios', {
-          nome: usuario.trim(),
-          email: '',
-          idioma: 'pt',
-          senhaHash: await hashPassword(senha),
-        });
+        // Cria o primeiro usuário e já retorna sessão ativa
+        await axios.post('/api/auth/setup', { nome: usuario.trim(), senha });
+        startSession();
+        onLogin();
+        return;
       } else {
         if (!usuario.trim()) { setErro(t('digiteUsuario')); setSalvando(false); return; }
       }
