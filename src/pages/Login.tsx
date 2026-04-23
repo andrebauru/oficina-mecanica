@@ -14,6 +14,12 @@ import HirataLogo from '../assets/Hirata Logo.svg';
 import { useLanguage } from '../components/LanguageContext';
 import { startSession } from '../utils/session';
 
+// Instância axios com credenciais e Content-Type garantidos para auth
+const authApi = axios.create({
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
+});
+
 interface LoginProps {
   onLogin: () => void;
 }
@@ -29,7 +35,7 @@ const Login = ({ onLogin }: LoginProps) => {
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    axios.get('/api/auth/status')
+    authApi.get('/api/auth/status')
       .then(res => setPrimeiroUso(!res.data?.hasUsers))
       .catch(() => setPrimeiroUso(false))
       .finally(() => setLoading(false));
@@ -47,7 +53,7 @@ const Login = ({ onLogin }: LoginProps) => {
         if (senha.length < 4) { setErro(t('senhaMinima')); setSalvando(false); return; }
 
         // Cria o primeiro usuário e já retorna sessão ativa
-        await axios.post('/api/auth/setup', { nome: usuario.trim(), senha });
+        await authApi.post('/api/auth/setup', { nome: usuario.trim(), senha });
         startSession();
         onLogin();
         return;
@@ -55,8 +61,7 @@ const Login = ({ onLogin }: LoginProps) => {
         if (!usuario.trim()) { setErro(t('digiteUsuario')); setSalvando(false); return; }
       }
 
-      // Autenticação server-side: cria sessão no servidor
-      await axios.post('/api/auth/login', { nome: usuario.trim(), senha });
+      await authApi.post('/api/auth/login', { nome: usuario.trim(), senha });
       startSession();
       onLogin();
     } catch (err: unknown) {

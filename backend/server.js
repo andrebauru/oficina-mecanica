@@ -50,13 +50,13 @@ async function resolveUserPasswordColumn() {
      FROM INFORMATION_SCHEMA.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE()
        AND TABLE_NAME = 'usuarios'
-       AND COLUMN_NAME IN ('senha_hash', 'senha')
-     ORDER BY FIELD(COLUMN_NAME, 'senha_hash', 'senha')`
+       AND COLUMN_NAME IN ('senha_hash', 'senha', 'senhaHash')
+     ORDER BY FIELD(COLUMN_NAME, 'senha_hash', 'senhaHash', 'senha')`
   );
 
   const passwordColumn = rows[0]?.COLUMN_NAME;
   if (!passwordColumn) {
-    const error = new Error("Tabela 'usuarios' sem coluna de senha válida (esperado: senha_hash ou senha).");
+    const error = new Error("Tabela 'usuarios' sem coluna de senha válida (esperado: senha_hash, senhaHash ou senha).");
     error.statusCode = 500;
     throw error;
   }
@@ -89,7 +89,12 @@ const ENTITY_ROUTES = {
       nome: 'nome',
       email: 'email',
       idioma: 'idioma',
+      cargo: 'cargo',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
     },
+    // senhaHash é resolvido dinamicamente por resolveUserPasswordColumn()
+    // e nunca exposto nas rotas CRUD genéricas
   },
   clientes: {
     table: 'clientes',
@@ -549,17 +554,18 @@ app.get('/api/auth/status', safeRoute(async (req, res) => {
 }));
 
 app.post('/api/auth/login', safeRoute(async (req, res) => {
-  const { email, senha } = req.body || {};
-  const loginEmail = String(email || '').trim();
-  if (!loginEmail || !senha) {
-    return sendAuthError(res, 400, 'Email e senha são obrigatórios.');
+  console.log('Recebido no login:', JSON.stringify(req.body));
+  const { nome, email, senha } = req.body || {};
+  const loginIdentifier = String(nome || email || '').trim();
+  if (!loginIdentifier || !senha) {
+    return sendAuthError(res, 400, 'Usuário e senha são obrigatórios.');
   }
 
   const passwordColumn = await resolveUserPasswordColumn();
 
   const rows = await query(
-    `SELECT id, nome, email, idioma, ${passwordColumn} AS senhaHash FROM usuarios WHERE email = ? LIMIT 1`,
-    [loginEmail]
+    `SELECT id, nome, email, idioma, ${passwordColumn} AS senhaHash FROM usuarios WHERE nome = ? OR email = ? LIMIT 1`,
+    [loginIdentifier, loginIdentifier]
   );
   const user = rows[0];
   if (!user) {
