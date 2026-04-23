@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "json-server": "json-server --watch db.json --port 3001"
+    "backend:dev": "npm --prefix backend run dev",
+    "backend:start": "npm --prefix backend run start"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -23,7 +24,6 @@
     "dayjs": "^1.11.13",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",
-    "json-server": "^1.0.0-beta.3",
     "jspdf": "^4.2.0",
     "lucide-react": "^0.577.0",
     "react": "^19.0.0",

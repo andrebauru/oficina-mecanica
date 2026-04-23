@@ -37,6 +37,8 @@ const collectionConfig = {
       email: 'email',
       telefone: 'telefone',
       endereco: 'endereco',
+      cnh_number: 'cnh_number',
+      observacoes_gerais: 'observacoes_gerais',
     },
   },
   veiculos: {
@@ -52,6 +54,9 @@ const collectionConfig = {
       placa: 'placa',
       chassi: 'chassi',
       kilometragem: 'kilometragem',
+      data_venda: 'data_venda',
+      nova_placa: 'nova_placa',
+      data_transferencia: 'data_transferencia',
     },
   },
   servicos: {

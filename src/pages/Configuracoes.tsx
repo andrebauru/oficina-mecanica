@@ -18,11 +18,10 @@ import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import LockIcon from '@mui/icons-material/Lock';
 import { useLanguage } from '../components/LanguageContext';
-import { hashPassword, sanitizeMultilineText, sanitizeText, verifyPassword } from '../utils/security';
+import { sanitizeMultilineText, sanitizeText } from '../utils/security';
 
 interface Configuracao {
   id?: string;
-  senhaHash?: string;
   nomeEmpresa?: string;
   endereco?: string;
   telefone?: string;
@@ -110,25 +109,20 @@ const Configuracoes = () => {
 
     setSalvandoSenha(true);
     try {
-      if (config.senhaHash && !(await verifyPassword(senhaAtual, config.senhaHash))) {
-        setSenhaErro(t('senhaAtualIncorreta'));
-        return;
-      }
-      const hashNova = await hashPassword(novaSenha);
-      const updated = { ...config, senhaHash: hashNova };
-      if (config.id) {
-        await axios.put(`/api/configuracoes/${config.id}`, updated);
-      } else {
-        const res = await axios.post('/api/configuracoes', updated);
-        setConfig(res.data);
-      }
-      setConfig(prev => ({ ...prev, senhaHash: hashNova }));
+      await axios.post('/api/auth/change-password', {
+        senhaAtual,
+        novaSenha,
+      });
       setSenhaAtual('');
       setNovaSenha('');
       setConfirmarSenha('');
       setSnackbar({ open: true, message: t('senhaAlterada'), severity: 'success' });
-    } catch {
-      setSnackbar({ open: true, message: t('erroAlterarSenha'), severity: 'error' });
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        setSenhaErro(t('senhaAtualIncorreta'));
+      } else {
+        setSnackbar({ open: true, message: t('erroAlterarSenha'), severity: 'error' });
+      }
     } finally {
       setSalvandoSenha(false);
     }

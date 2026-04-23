@@ -19,14 +19,14 @@ echo.
 echo 1. Copie a pasta 'dist\' via FTP para o servidor
 echo    - Destino: /var/www/oficina-mecanica/dist/
 echo.
-echo 2. Copie o arquivo 'db.json' para /var/www/oficina-mecanica/
+echo 2. Copie a pasta 'backend\' para /var/www/oficina-mecanica/backend/
 echo.
 echo 3. Copie o arquivo 'package.json' para /var/www/oficina-mecanica/
 echo.
 echo 4. No servidor Linux, execute:
-echo    cd /var/www/oficina-mecanica
+echo    cd /var/www/oficina-mecanica/backend
 echo    npm install
-echo    pm2 start "json-server --watch db.json --port 3001" --name "oficina"
+echo    pm2 start server.js --name "oficina-backend"
 echo.
 echo 5. Configure o Nginx:
 echo    - Veja o arquivo DEPLOYMENT.md para a configuração

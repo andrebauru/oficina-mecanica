@@ -29,8 +29,8 @@ const Login = ({ onLogin }: LoginProps) => {
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    axios.get('/api/usuarios')
-      .then(res => setPrimeiroUso(res.data.length === 0))
+    axios.get('/api/auth/status')
+      .then(res => setPrimeiroUso(!res.data?.hasUsers))
       .catch(() => setPrimeiroUso(false))
       .finally(() => setLoading(false));
   }, []);

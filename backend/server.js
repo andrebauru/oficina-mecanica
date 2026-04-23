@@ -3,7 +3,7 @@ const cors = require('cors');
 const session = require('express-session');
 const crypto = require('crypto');
 const env = require('./src/config/env');
-const { testConnection, query } = require('./src/config/database');
+const { testConnection, query, normalizeDatabaseError } = require('./src/config/database');
 const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout');
 const {
   collectionConfig,
@@ -50,6 +50,25 @@ function upgradePasswordHash(senha) {
 
 const app = express();
 
+function safeRoute(handler) {
+  return async (req, res, next) => {
+    try {
+      await handler(req, res, next);
+    } catch (error) {
+      next(normalizeDatabaseError(error));
+    }
+  };
+}
+
+function sendAuthError(res, status, message, details) {
+  return res.status(status).json({
+    ok: false,
+    code: status,
+    message,
+    ...(details ? { details } : {}),
+  });
+}
+
 app.use(cors({
   origin: (origin, callback) => callback(null, origin || 'http://localhost:5173'),
   credentials: true,
@@ -75,7 +94,7 @@ app.use(session({
 app.use(sessionTimeout);
 
 // Middleware de autenticação: bloqueia mutações sem sessão ativa
-const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/auth/setup', '/api/session', '/api/health'];
+const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/auth/setup', '/api/auth/status', '/api/session', '/api/health'];
 function requireAuth(req, res, next) {
   if (req.method === 'GET') return next();
   if (AUTH_PUBLIC_PATHS.some(p => req.path === p)) return next();
@@ -91,14 +110,14 @@ app.use('/api', clientCrmRouter);
 // Usar rotas de contratos
 app.use('/api', contractsRouter);
 
-app.get('/api/health', async (_req, res) => {
+app.get('/api/health', safeRoute(async (_req, res) => {
   try {
     await testConnection();
     res.json({ status: 'ok', database: 'mysql' });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
-});
+}));
 
 app.get('/api/session', (req, res) => {
   res.json({
@@ -108,10 +127,22 @@ app.get('/api/session', (req, res) => {
   });
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.get('/api/auth/status', safeRoute(async (req, res) => {
+  const rows = await query('SELECT COUNT(*) AS total FROM usuarios');
+  const total = Number(rows[0]?.total || 0);
+  res.json({
+    authenticated: Boolean(req.session?.user),
+    expiresInMs: ONE_HOUR_MS,
+    lastActivity: req.session?.lastActivity || null,
+    hasUsers: total > 0,
+    user: req.session?.user || null,
+  });
+}));
+
+app.post('/api/auth/login', safeRoute(async (req, res) => {
   const { nome, senha } = req.body || {};
   if (!nome || !senha) {
-    return res.status(400).json({ message: 'Nome e senha são obrigatórios' });
+    return sendAuthError(res, 400, 'Nome e senha são obrigatórios.');
   }
 
   const rows = await query(
@@ -119,8 +150,11 @@ app.post('/api/auth/login', async (req, res) => {
     [nome]
   );
   const user = rows[0];
-  if (!user || !verifyPassword(senha, user.senhaHash)) {
-    return res.status(401).json({ message: 'Usuário ou senha inválidos' });
+  if (!user) {
+    return sendAuthError(res, 401, 'Usuário não encontrado.');
+  }
+  if (!verifyPassword(senha, user.senhaHash)) {
+    return sendAuthError(res, 401, 'Senha incorreta.');
   }
 
   // Auto-upgrade de hash legado para sha256
@@ -138,35 +172,30 @@ app.post('/api/auth/login', async (req, res) => {
   req.session.lastActivity = Date.now();
 
   return res.json({ authenticated: true, user: req.session.user, expiresInMs: ONE_HOUR_MS });
-});
+}));
 
 // Endpoint público de setup inicial: cria o primeiro usuário (bloqueado se já existirem usuários)
-app.post('/api/auth/setup', async (req, res) => {
-  try {
-    const { nome, senha } = req.body || {};
-    if (!nome || !senha) {
-      return res.status(400).json({ message: 'Nome e senha são obrigatórios' });
-    }
-    const existingUsers = await query('SELECT id FROM usuarios LIMIT 1');
-    if (existingUsers.length > 0) {
-      return res.status(403).json({ message: 'Já existe um usuário cadastrado. Use o login normal.' });
-    }
-    const salt = crypto.randomBytes(16).toString('hex');
-    const digest = crypto.createHash('sha256').update(`${salt}:${senha}`).digest('hex');
-    const senhaHash = `sha256:${salt}:${digest}`;
-    const newId = `usr${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    await query(
-      'INSERT INTO usuarios (id, nome, email, idioma, senha_hash) VALUES (?, ?, ?, ?, ?)',
-      [newId, nome.trim(), '', 'pt', senhaHash]
-    );
-    req.session.user = { id: newId, nome: nome.trim(), email: '', idioma: 'pt' };
-    req.session.lastActivity = Date.now();
-    return res.status(201).json({ authenticated: true, user: req.session.user, expiresInMs: ONE_HOUR_MS });
-  } catch (error) {
-    console.error('[setup] Erro:', error);
-    return res.status(500).json({ message: 'Erro ao criar usuário inicial', error: error.message });
+app.post('/api/auth/setup', safeRoute(async (req, res) => {
+  const { nome, senha } = req.body || {};
+  if (!nome || !senha) {
+    return sendAuthError(res, 400, 'Nome e senha são obrigatórios.');
   }
-});
+  const existingUsers = await query('SELECT id FROM usuarios LIMIT 1');
+  if (existingUsers.length > 0) {
+    return sendAuthError(res, 403, 'Já existe um usuário cadastrado. Use o login normal.');
+  }
+  const salt = crypto.randomBytes(16).toString('hex');
+  const digest = crypto.createHash('sha256').update(`${salt}:${senha}`).digest('hex');
+  const senhaHash = `sha256:${salt}:${digest}`;
+  const newId = `usr${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  await query(
+    'INSERT INTO usuarios (id, nome, email, idioma, senha_hash) VALUES (?, ?, ?, ?, ?)',
+    [newId, nome.trim(), '', 'pt', senhaHash]
+  );
+  req.session.user = { id: newId, nome: nome.trim(), email: '', idioma: 'pt' };
+  req.session.lastActivity = Date.now();
+  return res.status(201).json({ authenticated: true, user: req.session.user, expiresInMs: ONE_HOUR_MS });
+}));
 
 app.post('/api/auth/logout', (req, res) => {
   if (!req.session) {
@@ -177,6 +206,28 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+app.post('/api/auth/change-password', safeRoute(async (req, res) => {
+  const userId = req.session?.user?.id;
+  if (!userId) {
+    return sendAuthError(res, 401, 'Sessão inválida.');
+  }
+
+  const { senhaAtual, novaSenha } = req.body || {};
+  if (!senhaAtual || !novaSenha) {
+    return sendAuthError(res, 400, 'Senha atual e nova senha são obrigatórias.');
+  }
+
+  const rows = await query('SELECT id, senha_hash AS senhaHash FROM usuarios WHERE id = ? LIMIT 1', [userId]);
+  const user = rows[0];
+  if (!user || !verifyPassword(senhaAtual, user.senhaHash)) {
+    return sendAuthError(res, 401, 'Senha atual incorreta.');
+  }
+
+  const newHash = upgradePasswordHash(novaSenha);
+  await query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [newHash, userId]);
+  return res.json({ success: true });
+}));
+
 const editableCollections = Object.keys(collectionConfig);
 
 async function findById(collectionName, id) {
@@ -185,7 +236,7 @@ async function findById(collectionName, id) {
   return rows[0] ? toClientRecord(collectionName, rows[0]) : null;
 }
 
-app.get('/api/:collection', async (req, res) => {
+app.get('/api/:collection', safeRoute(async (req, res) => {
   const { collection } = req.params;
   if (!editableCollections.includes(collection)) {
     return res.status(404).json({ message: 'Coleção não encontrada' });
@@ -207,9 +258,9 @@ app.get('/api/:collection', async (req, res) => {
   const whereClause = filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const rows = await query(`SELECT * FROM ${entity.table}${whereClause} ORDER BY ${entity.idField} ASC`, params);
   return res.json(rows.map(row => toClientRecord(collection, row)));
-});
+}));
 
-app.get('/api/:collection/:id', async (req, res) => {
+app.get('/api/:collection/:id', safeRoute(async (req, res) => {
   const { collection, id } = req.params;
   if (!editableCollections.includes(collection)) {
     return res.status(404).json({ message: 'Coleção não encontrada' });
@@ -218,9 +269,9 @@ app.get('/api/:collection/:id', async (req, res) => {
   const found = await findById(collection, id);
   if (!found) return res.status(404).json({ message: 'Registro não encontrado' });
   return res.json(found);
-});
+}));
 
-app.post('/api/:collection', async (req, res) => {
+app.post('/api/:collection', safeRoute(async (req, res) => {
   const { collection } = req.params;
   if (!editableCollections.includes(collection)) {
     return res.status(404).json({ message: 'Coleção não encontrada' });
@@ -239,9 +290,9 @@ app.post('/api/:collection', async (req, res) => {
 
   const created = await findById(collection, dbRecord[entity.idField]);
   return res.status(201).json(created);
-});
+}));
 
-app.put('/api/:collection/:id', async (req, res) => {
+app.put('/api/:collection/:id', safeRoute(async (req, res) => {
   const { collection, id } = req.params;
   if (!editableCollections.includes(collection)) {
     return res.status(404).json({ message: 'Coleção não encontrada' });
@@ -261,9 +312,9 @@ app.put('/api/:collection/:id', async (req, res) => {
   await query(`UPDATE ${entity.table} SET ${updateSql} WHERE ${entity.idField} = ?`, params);
   const updated = await findById(collection, id);
   return res.json(updated);
-});
+}));
 
-app.patch('/api/:collection/:id', async (req, res) => {
+app.patch('/api/:collection/:id', safeRoute(async (req, res) => {
   const { collection, id } = req.params;
   if (!editableCollections.includes(collection)) {
     return res.status(404).json({ message: 'Coleção não encontrada' });
@@ -282,9 +333,9 @@ app.patch('/api/:collection/:id', async (req, res) => {
   await query(`UPDATE ${entity.table} SET ${updateSql} WHERE ${entity.idField} = ?`, params);
   const updated = await findById(collection, id);
   return res.json(updated);
-});
+}));
 
-app.delete('/api/:collection/:id', async (req, res) => {
+app.delete('/api/:collection/:id', safeRoute(async (req, res) => {
   const { collection, id } = req.params;
   if (!editableCollections.includes(collection)) {
     return res.status(404).json({ message: 'Coleção não encontrada' });
@@ -296,6 +347,25 @@ app.delete('/api/:collection/:id', async (req, res) => {
 
   await query(`DELETE FROM ${entity.table} WHERE ${entity.idField} = ?`, [id]);
   return res.status(204).send();
+}));
+
+app.use((error, _req, res, _next) => {
+  const normalized = normalizeDatabaseError(error);
+  const statusCode = normalized.statusCode || 500;
+
+  if (statusCode === 503 || statusCode === 504) {
+    return res.status(statusCode).json({
+      ok: false,
+      code: statusCode,
+      message: normalized.message,
+    });
+  }
+
+  return res.status(statusCode).json({
+    ok: false,
+    code: statusCode,
+    message: normalized.message || 'Erro interno do servidor.',
+  });
 });
 
 app.listen(env.apiPort, async () => {

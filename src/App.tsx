@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ptBR } from '@mui/material/locale';
@@ -18,7 +19,7 @@ import Configuracoes from './pages/Configuracoes';
 import Usuarios from './pages/Usuarios';
 import VendasGestao from './pages/VendasGestao';
 import Login from './pages/Login';
-import { clearSession, isSessionAuthenticated, touchSession } from './utils/session';
+import { clearSession, isSessionAuthenticated, startSession, touchSession } from './utils/session';
 import './App.css'
 
 const theme = createTheme(
@@ -57,8 +58,32 @@ function App() {
   );
 
   useEffect(() => {
-    setAuthenticated(isSessionAuthenticated());
-    setChecking(false);
+    let isMounted = true;
+
+    axios.get('/api/auth/status')
+      .then(res => {
+        if (!isMounted) return;
+        const isAuthenticated = Boolean(res.data?.authenticated);
+        if (isAuthenticated) {
+          startSession();
+        } else {
+          clearSession();
+        }
+        setAuthenticated(isAuthenticated);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        const fallback = isSessionAuthenticated();
+        if (!fallback) clearSession();
+        setAuthenticated(fallback);
+      })
+      .finally(() => {
+        if (isMounted) setChecking(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
