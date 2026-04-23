@@ -72,11 +72,13 @@ const ENTITY_ROUTES = {
     idPrefix: 'cfg',
     fields: {
       id: 'id',
-      senhaHash: 'senha_hash',
-      nomeEmpresa: 'nome_empresa',
+      senhaHash: 'senhaHash',
+      nomeEmpresa: 'nomeEmpresa',
       endereco: 'endereco',
       telefone: 'telefone',
-      numeroAutorizacao: 'numero_autorizacao',
+      numeroAutorizacao: 'numeroAutorizacao',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
     },
     sensitiveFields: ['senhaHash'],
   },
@@ -89,12 +91,12 @@ const ENTITY_ROUTES = {
       nome: 'nome',
       email: 'email',
       idioma: 'idioma',
+      senhaHash: 'senhaHash',
       cargo: 'cargo',
       createdAt: 'createdAt',
       updatedAt: 'updatedAt',
     },
-    // senhaHash é resolvido dinamicamente por resolveUserPasswordColumn()
-    // e nunca exposto nas rotas CRUD genéricas
+    sensitiveFields: ['senhaHash'],
   },
   clientes: {
     table: 'clientes',
@@ -108,6 +110,8 @@ const ENTITY_ROUTES = {
       endereco: 'endereco',
       cnh_number: 'cnh_number',
       observacoes_gerais: 'observacoes_gerais',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
     },
   },
   veiculos: {
@@ -116,7 +120,7 @@ const ENTITY_ROUTES = {
     idPrefix: 'vei',
     fields: {
       id: 'id',
-      clienteId: 'cliente_id',
+      clienteId: 'clienteId',
       marca: 'marca',
       modelo: 'modelo',
       ano: 'ano',
@@ -126,6 +130,8 @@ const ENTITY_ROUTES = {
       data_venda: 'data_venda',
       nova_placa: 'nova_placa',
       data_transferencia: 'data_transferencia',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
     },
   },
   servicos: {
@@ -137,7 +143,9 @@ const ENTITY_ROUTES = {
       nome: 'nome',
       descricao: 'descricao',
       valor: 'valor',
-      tempoEstimado: 'tempo_estimado',
+      tempoEstimado: 'tempoEstimado',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
     },
   },
   pecas: {
@@ -149,9 +157,11 @@ const ENTITY_ROUTES = {
       nome: 'nome',
       codigo: 'codigo',
       marca: 'marca',
-      modeloCompativel: 'modelo_compativel',
+      modeloCompativel: 'modeloCompativel',
       preco: 'preco',
       quantidade: 'quantidade',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
     },
   },
   ordens_servico: {
@@ -160,21 +170,25 @@ const ENTITY_ROUTES = {
     idPrefix: 'os',
     fields: {
       id: 'id',
-      veiculoId: 'veiculo_id',
-      clienteId: 'cliente_id',
-      dataEntrada: 'data_entrada',
-      dataSaida: 'data_saida',
+      veiculoId: 'veiculoId',
+      clienteId: 'clienteId',
+      dataEntrada: 'dataEntrada',
+      dataSaida: 'dataSaida',
       status: 'status',
       descricao: 'descricao',
-      servicosIds: 'servicos_ids_json',
-      pecasIds: 'pecas_ids_json',
-      valorTotal: 'valor_total',
+      servicos_ids_json: 'servicos_ids_json',
+      pecas_ids_json: 'pecas_ids_json',
+      valorTotal: 'valorTotal',
       valorBase: 'valor_base',
       parcelas: 'parcelas',
       juros: 'juros',
-      parcelasStatus: 'parcelas_status_json',
+      parcelas_status_json: 'parcelas_status_json',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
+      relatorioPath: 'relatorioPath',
+      relatorioGeradoEm: 'relatorioGeradoEm',
     },
-    jsonFields: ['servicosIds', 'pecasIds', 'parcelasStatus'],
+    jsonFields: ['servicos_ids_json', 'pecas_ids_json', 'parcelas_status_json'],
   },
   vendas_carros: {
     table: 'vendas_carros',
@@ -182,7 +196,7 @@ const ENTITY_ROUTES = {
     idPrefix: 'vc',
     fields: {
       id: 'id',
-      clienteId: 'cliente_id',
+      clienteId: 'clienteId',
       clienteNome: 'cliente_nome',
       clienteTelefone: 'cliente_telefone',
       clienteEndereco: 'cliente_endereco',
@@ -195,11 +209,15 @@ const ENTITY_ROUTES = {
       parcelas: 'parcelas',
       juros: 'juros',
       valorTotal: 'valor_total',
-      parcelasStatus: 'parcelas_status_json',
+      parcelas_status_json: 'parcelas_status_json',
       reciboPDF: 'recibo_pdf',
       reciboGeradoEm: 'recibo_gerado_em',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
+      contratoPath: 'contratoPath',
+      contratoGeradoEm: 'contratoGeradoEm',
     },
-    jsonFields: ['parcelasStatus'],
+    jsonFields: ['parcelas_status_json'],
   },
   financeiro: {
     table: 'financeiro',
@@ -213,6 +231,8 @@ const ENTITY_ROUTES = {
       valor: 'valor',
       descricao: 'descricao',
       categoriaId: 'categoria_id',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
     },
   },
   categorias_financeiro: {
@@ -223,6 +243,8 @@ const ENTITY_ROUTES = {
       id: 'id',
       nome: 'nome',
       tipo: 'tipo',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
     },
   },
   documentos: {
@@ -241,6 +263,8 @@ const ENTITY_ROUTES = {
       referenciaTipo: 'referencia_tipo',
       arquivoOriginal: 'arquivo_original',
       dataUpload: 'data_upload',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
     },
   },
   vendas: {
@@ -269,6 +293,8 @@ const ENTITY_ROUTES = {
       reciboPDF: 'recibo_pdf',
       reciboGeradoEm: 'recibo_gerado_em',
       observacoes: 'observacoes',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
     },
   },
   parcelas: {
@@ -285,6 +311,8 @@ const ENTITY_ROUTES = {
       dataPagamento: 'data_pagamento',
       clienteNome: 'cliente_nome',
       clienteTelefone: 'cliente_telefone',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
     },
   },
   agendamentos: {
@@ -293,12 +321,14 @@ const ENTITY_ROUTES = {
     idPrefix: 'agd',
     fields: {
       id: 'id',
-      clienteId: 'cliente_id',
-      veiculoId: 'veiculo_id',
+      clienteId: 'clienteId',
+      veiculoId: 'veiculoId',
       titulo: 'titulo',
       descricao: 'descricao',
       dataAgendamento: 'data_agendamento',
       status: 'status',
+      created_at: 'created_at',
+      updated_at: 'updated_at',
     },
   },
 };
@@ -558,13 +588,11 @@ app.post('/api/auth/login', safeRoute(async (req, res) => {
   const { nome, email, senha } = req.body || {};
   const loginIdentifier = String(nome || email || '').trim();
   if (!loginIdentifier || !senha) {
-    return sendAuthError(res, 400, 'Usuário e senha são obrigatórios.');
+    return sendAuthError(res, 400, 'Usuário/Email e senha são obrigatórios.');
   }
 
-  const passwordColumn = await resolveUserPasswordColumn();
-
   const rows = await query(
-    `SELECT id, nome, email, idioma, ${passwordColumn} AS senhaHash FROM usuarios WHERE nome = ? OR email = ? LIMIT 1`,
+    'SELECT id, nome, email, idioma, senhaHash FROM usuarios WHERE nome = ? OR email = ? LIMIT 1',
     [loginIdentifier, loginIdentifier]
   );
   const user = rows[0];
@@ -578,7 +606,7 @@ app.post('/api/auth/login', safeRoute(async (req, res) => {
   // Auto-upgrade de hash legado para sha256
   if (user.senhaHash && !user.senhaHash.startsWith('sha256:')) {
     const newHash = upgradePasswordHash(senha);
-    await query(`UPDATE usuarios SET ${passwordColumn} = ? WHERE id = ?`, [newHash, user.id]).catch(() => {});
+    await query('UPDATE usuarios SET senhaHash = ? WHERE id = ?', [newHash, user.id]).catch(() => {});
   }
 
   req.session.user = {
@@ -598,7 +626,6 @@ app.post('/api/auth/setup', safeRoute(async (req, res) => {
   if (!nome || !senha) {
     return sendAuthError(res, 400, 'Nome e senha são obrigatórios.');
   }
-  const passwordColumn = await resolveUserPasswordColumn();
   const existingUsers = await query('SELECT id FROM usuarios LIMIT 1');
   if (existingUsers.length > 0) {
     return sendAuthError(res, 403, 'Já existe um usuário cadastrado. Use o login normal.');
@@ -608,7 +635,7 @@ app.post('/api/auth/setup', safeRoute(async (req, res) => {
   const senhaHash = `sha256:${salt}:${digest}`;
   const newId = `usr${Date.now()}${Math.floor(Math.random() * 1000)}`;
   await query(
-    `INSERT INTO usuarios (id, nome, email, idioma, ${passwordColumn}) VALUES (?, ?, ?, ?, ?)`,
+    'INSERT INTO usuarios (id, nome, email, idioma, senhaHash) VALUES (?, ?, ?, ?, ?)',
     [newId, nome.trim(), '', 'pt', senhaHash]
   );
   req.session.user = { id: newId, nome: nome.trim(), email: '', idioma: 'pt' };
@@ -636,19 +663,14 @@ app.post('/api/auth/change-password', safeRoute(async (req, res) => {
     return sendAuthError(res, 400, 'Senha atual e nova senha são obrigatórias.');
   }
 
-  const passwordColumn = await resolveUserPasswordColumn();
-
-  const rows = await query(
-    `SELECT id, ${passwordColumn} AS senhaHash FROM usuarios WHERE id = ? LIMIT 1`,
-    [userId]
-  );
+  const rows = await query('SELECT id, senhaHash FROM usuarios WHERE id = ? LIMIT 1', [userId]);
   const user = rows[0];
   if (!user || !verifyPassword(senhaAtual, user.senhaHash)) {
     return sendAuthError(res, 401, 'Senha atual incorreta.');
   }
 
   const newHash = upgradePasswordHash(novaSenha);
-  await query(`UPDATE usuarios SET ${passwordColumn} = ? WHERE id = ?`, [newHash, userId]);
+  await query('UPDATE usuarios SET senhaHash = ? WHERE id = ?', [newHash, userId]);
   return res.json({ success: true });
 }));
 
