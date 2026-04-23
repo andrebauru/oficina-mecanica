@@ -1,37 +1,38 @@
 @echo off
-REM Script de Deploy para Windows
-REM Use: deploy.bat
+REM ============================================================
+REM deploy.bat — Push local para o repositório (Hirata Cars)
+REM Executar no PC de desenvolvimento: deploy.bat
+REM ============================================================
 
 echo.
-echo 🔨 Compilando o projeto...
-call npm run build
+echo ====================================================
+echo  Hirata Cars — Deploy Local (git push)
+echo ====================================================
+echo.
 
-if errorlevel 1 (
-    echo ❌ Erro na compilação!
-    exit /b 1
-)
+REM Perguntar mensagem do commit
+set /p COMMIT_MSG="Mensagem do commit (Enter = 'chore: update'): "
+if "%COMMIT_MSG%"=="" set COMMIT_MSG=chore: update
 
 echo.
-echo ✅ Build concluído!
+echo [1/4] Adicionando todos os arquivos alterados...
+git add -A
+
 echo.
-echo 📋 Próximos passos:
+echo [2/4] Criando commit: %COMMIT_MSG%
+git commit -m "%COMMIT_MSG%" || echo (nada novo para commitar, continuando...)
+
 echo.
-echo 1. Copie a pasta 'dist\' via FTP para o servidor
-echo    - Destino: /var/www/oficina-mecanica/dist/
+echo [3/4] Enviando para origin/master (--force)...
+git push origin master --force
+
 echo.
-echo 2. Copie a pasta 'backend\' para /var/www/oficina-mecanica/backend/
+echo [4/4] Status atual do repositorio:
+git log --oneline -5
+
 echo.
-echo 3. Copie o arquivo 'package.json' para /var/www/oficina-mecanica/
-echo.
-echo 4. No servidor Linux, execute:
-echo    cd /var/www/oficina-mecanica/backend
-echo    npm install
-echo    pm2 start server.js --name "oficina-backend"
-echo.
-echo 5. Configure o Nginx:
-echo    - Veja o arquivo DEPLOYMENT.md para a configuração
-echo    - Execute: sudo systemctl reload nginx
-echo.
-echo 📖 Leia o arquivo DEPLOYMENT.md para mais detalhes!
+echo ====================================================
+echo  Push concluido! Acesse o servidor e rode: ./deploy.sh
+echo ====================================================
 echo.
 pause

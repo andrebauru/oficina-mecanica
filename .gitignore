@@ -1,2 +1,39 @@
+# === Dependências ===
 node_modules/
 .venv/
+
+# === Build outputs ===
+dist/
+dist-build.tar.gz
+
+# === Variáveis de ambiente ===
+.env
+.env.local
+.env.*.local
+.env.production
+
+# === Logs ===
+logs/
+*.log
+npm-debug.log*
+
+# === Uploads (gerados em runtime) ===
+backend/storage/
+public/uploads/
+
+# === Backups e arquivos temporários ===
+*.zip
+*.sql
+*.bak
+db.json
+db-copy.json
+db-*.json
+
+# === IDEs e SO ===
+.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# === Misc ===
+.claude/

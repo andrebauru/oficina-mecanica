@@ -7,6 +7,8 @@ const { generateContractPdfBuffer } = require('../services/contractPdf');
 
 const router = express.Router();
 const CONTRACTS_DIR = path.join(__dirname, '../../storage/uploads/contracts');
+const DEFAULT_CONTRACT_LANGUAGES = ['pt', 'ja'];
+const VALID_CONTRACT_LANGUAGES = ['pt', 'ja', 'fil', 'vi', 'id', 'en'];
 
 function ensureContractsDir() {
   if (!fs.existsSync(CONTRACTS_DIR)) {
@@ -25,7 +27,38 @@ function resolveSafeAbsolutePath(relativePath) {
   return absolute;
 }
 
-// Dashboard de entrega - vendas sem contrato gerado
+function normalizeContractLanguages(payload) {
+  const rawLanguages = Array.isArray(payload?.idiomas)
+    ? payload.idiomas
+    : payload?.idioma
+      ? [payload.idioma]
+      : DEFAULT_CONTRACT_LANGUAGES;
+
+  const normalized = rawLanguages
+    .map((idioma) => String(idioma || '').trim().toLowerCase())
+    .filter((idioma, index, array) => idioma && array.indexOf(idioma) === index);
+
+  if (normalized.length === 0) {
+    return { idiomas: DEFAULT_CONTRACT_LANGUAGES, invalid: [] };
+  }
+
+  const invalid = normalized.filter((idioma) => !VALID_CONTRACT_LANGUAGES.includes(idioma));
+  return {
+    idiomas: normalized.filter((idioma) => VALID_CONTRACT_LANGUAGES.includes(idioma)),
+    invalid,
+  };
+}
+
+function sanitizeFileNamePart(value) {
+  return String(value || 'Cliente')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80) || 'Cliente';
+}
+
+// Contratos - vendas sem contrato gerado
 router.get('/vendas_carros/pending-delivery', async (_req, res) => {
   try {
     const rows = await query(
@@ -53,7 +86,7 @@ router.get('/vendas_carros/pending-delivery', async (_req, res) => {
   }
 });
 
-// Dashboard de entrega - vendas com contrato gerado
+// Contratos - vendas com contrato gerado
 router.get('/vendas_carros/contracts/generated', async (_req, res) => {
   try {
     const rows = await query(
@@ -84,10 +117,13 @@ router.get('/vendas_carros/contracts/generated', async (_req, res) => {
 router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
   try {
     const { vendaId } = req.params;
-    const idioma = String(req.body?.idioma || 'pt').trim().toLowerCase();
+    const { idiomas, invalid } = normalizeContractLanguages(req.body);
 
-    if (!['pt', 'ja'].includes(idioma)) {
-      return res.status(400).json({ message: 'Idioma inválido. Use pt ou ja.' });
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        message: `Idioma inválido. Use apenas: ${VALID_CONTRACT_LANGUAGES.join(', ')}.`,
+        invalid,
+      });
     }
 
     const vendaRows = await query('SELECT * FROM vendas_carros WHERE id = ? LIMIT 1', [vendaId]);
@@ -105,12 +141,14 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     const configuracao = configRows[0] || null;
 
     ensureContractsDir();
-    const fileName = `contrato_venda_${venda.id}_${Date.now()}_${idioma}.pdf`;
+    const clientName = sanitizeFileNamePart(cliente?.nome || venda?.cliente_nome || 'Cliente');
+    const fileDate = new Date().toISOString().slice(0, 10);
+    const fileName = `${clientName}_${fileDate}.pdf`;
     const absolutePath = path.join(CONTRACTS_DIR, fileName);
     const relativePath = normalizeRelativeContractPath(absolutePath);
 
     const pdfBuffer = await generateContractPdfBuffer({
-      idioma,
+      idiomas,
       venda,
       cliente,
       configuracao,
@@ -126,7 +164,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     return res.status(201).json({
       success: true,
       vendaId: venda.id,
-      idioma,
+      idiomas,
       contratoPath: relativePath,
       contratoGeradoEm: new Date().toISOString(),
       viewUrl: `/api/vendas_carros/${venda.id}/contracts/view`,

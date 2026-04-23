@@ -1,24 +1,42 @@
 #!/bin/bash
 
-# Script de Deploy para Servidor Linux
-# Use: chmod +x deploy.sh && ./deploy.sh
+# ============================================================
+# deploy.sh — Deploy no Servidor Linux (Hirata Cars)
+# Executar DENTRO do servidor: ./deploy.sh
+# ============================================================
 
 set -e
 
-echo "🔨 Compilando o projeto..."
+PROJECT_DIR="/var/www/oficina-mecanica"
+
+echo "🚀 Iniciando deploy — $(date '+%Y-%m-%d %H:%M:%S')"
+
+# 1. Entrar na pasta do projeto
+cd "$PROJECT_DIR"
+echo "📁 Diretório: $PROJECT_DIR"
+
+# 2. Atualizar código do repositório
+echo "🔄 Atualizando código..."
+git fetch --all
+git reset --hard origin/master
+
+# 3. Instalar dependências do Backend
+echo "📦 Instalando dependências do backend..."
+cd backend
+npm install
+cd ..
+
+# 4. Instalar dependências do Frontend e fazer build
+echo "📦 Instalando dependências do frontend..."
+npm install
+
+echo "🔨 Compilando frontend..."
 npm run build
 
-echo "📦 Criando arquivo de deployment..."
-tar -czf dist-build.tar.gz dist/ package.json backend/
+# 5. Reiniciar serviço via PM2
+echo "♻️  Reiniciando serviço PM2..."
+pm2 restart hirata-backend
+pm2 save
 
-echo "✅ Build concluído!"
-echo "📋 Arquivo: dist-build.tar.gz"
 echo ""
-echo "Próximos passos:"
-echo "1. Copie 'dist-build.tar.gz' para o servidor"
-echo "2. No servidor, execute:"
-echo "   tar -xzf dist-build.tar.gz"
-echo "   cd backend && npm install"
-echo "   pm2 start server.js --name 'oficina-backend'"
-echo "   # Atualize a configuração do nginx com o arquivo DEPLOYMENT.md"
-echo "   sudo systemctl reload nginx"
+echo "✅ Deploy concluído com sucesso — $(date '+%Y-%m-%d %H:%M:%S')"

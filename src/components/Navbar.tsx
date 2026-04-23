@@ -19,7 +19,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SettingsIcon from '@mui/icons-material/Settings';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import ArticleIcon from '@mui/icons-material/Article';
 import HirataLogo from '../assets/Hirata Logo.svg';
 import { useLanguage } from './LanguageContext';
 
@@ -35,7 +35,7 @@ const navItems = [
   { key: 'pecas',          path: '/pecas',           icon: <BuildIcon /> },
   { key: 'vendasCarros',   path: '/vendas-carros',   icon: <MonetizationOnIcon /> },
   { key: 'vendasGestao',   path: '/vendas-gestao',   icon: <AccountBalanceWalletIcon /> },
-  { key: 'dashboardEntrega', path: '/dashboard-entrega', icon: <LocalShippingIcon /> },
+  { key: 'contratos',        path: '/contratos',          icon: <ArticleIcon /> },
   { key: 'financeiro',     path: '/financeiro',      icon: <AccountBalanceWalletIcon /> },
   { key: 'relatorios',     path: '/relatorios',      icon: <AssessmentIcon /> },
   { key: 'gerarRelatorio', path: '/gerar-relatorio', icon: <PictureAsPdfIcon /> },

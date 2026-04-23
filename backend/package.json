@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
-    "import:json": "node src/scripts/import-json.js",
     "check": "node --check server.js && node --check src/config/database.js && node --check src/config/env.js && node --check src/middleware/sessionTimeout.js",
     "test": "echo \"No tests specified\""
   },

@@ -537,15 +537,16 @@ app.use(session({
 }));
 app.use(sessionTimeout);
 
-// Middleware de autenticação: bloqueia mutações sem sessão ativa
-const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/auth/setup', '/api/auth/status', '/api/session', '/api/health'];
+// Middleware Zero Trust: toda rota /api exige sessão, exceto bootstrap de autenticação
+const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/setup', '/api/auth/status', '/api/health'];
 function requireAuth(req, res, next) {
+  if (!req.path.startsWith('/api/')) return next();
   if (req.method === 'OPTIONS') return next();
-  if (AUTH_PUBLIC_PATHS.some(p => req.path === p)) return next();
+  if (AUTH_PUBLIC_PATHS.some(publicPath => req.path === publicPath)) return next();
   if (!req.session?.user) {
     return res.status(401).json({ message: 'Não autenticado. Faça login para continuar.' });
   }
-  next();
+  return next();
 }
 app.use(requireAuth);
 

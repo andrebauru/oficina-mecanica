@@ -17,7 +17,6 @@
     "@mui/icons-material": "^6.4.6",
     "@mui/material": "^6.4.6",
     "@mui/x-date-pickers": "^7.27.1",
-    "@react-pdf/renderer": "^4.3.2",
     "axios": "^1.8.1",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",

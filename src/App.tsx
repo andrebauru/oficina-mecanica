@@ -18,7 +18,7 @@ import GerarRelatorio from './pages/GerarRelatorio';
 import Configuracoes from './pages/Configuracoes';
 import Usuarios from './pages/Usuarios';
 import VendasGestao from './pages/VendasGestao';
-import DashboardEntrega from './pages/DashboardEntrega';
+import Contratos from './pages/Contratos';
 import Login from './pages/Login';
 import { clearSession, isSessionAuthenticated, startSession, touchSession } from './utils/session';
 import './App.css'
@@ -148,7 +148,7 @@ function App() {
                   <Route path="/ordens" element={<OrdensServico />} />
                   <Route path="/vendas-carros" element={<VendasCarros />} />
                   <Route path="/vendas-gestao" element={<VendasGestao />} />
-                  <Route path="/dashboard-entrega" element={<DashboardEntrega />} />
+                  <Route path="/contratos" element={<Contratos />} />
                   <Route path="/financeiro" element={<Financeiro />} />
                   <Route path="/relatorios" element={<Relatorios />} />
                   <Route path="/gerar-relatorio" element={<GerarRelatorio />} />

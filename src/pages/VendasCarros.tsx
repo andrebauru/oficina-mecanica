@@ -84,6 +84,19 @@ interface ConfiguracaoEmpresa {
   numeroAutorizacao?: string;
 }
 
+type IdiomaContrato = 'pt' | 'ja' | 'fil' | 'vi' | 'id' | 'en';
+
+const IDIOMAS_CONTRATO_DISPONIVEIS: Array<{ value: IdiomaContrato; label: string }> = [
+  { value: 'pt', label: '🇧🇷 Português' },
+  { value: 'ja', label: '🇯🇵 日本語' },
+  { value: 'fil', label: '🇵🇭 Tagalo' },
+  { value: 'vi', label: '🇻🇳 Vietnamita' },
+  { value: 'id', label: '🇮🇩 Indonésio' },
+  { value: 'en', label: '🇺🇸 English' },
+];
+
+const IDIOMAS_CONTRATO_PADRAO: IdiomaContrato[] = ['pt', 'ja'];
+
 
 const vendaCarroVazio: VendaCarroFormData = {
   valor: '',
@@ -128,7 +141,7 @@ const VendasCarros = () => {
   const [clientes, setClientes] = useState<Array<{id: string; nome: string; telefone?: string; endereco?: string}>>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<{id: string; nome: string; telefone?: string; endereco?: string} | null>(null);
   const [configEmpresa, setConfigEmpresa] = useState<ConfiguracaoEmpresa>({});
-  const [idiomaContrato, setIdiomaContrato] = useState<'pt' | 'ja'>('pt');
+  const [idiomasContrato, setIdiomasContrato] = useState<IdiomaContrato[]>(IDIOMAS_CONTRATO_PADRAO);
 
   // Cálculo automático de valorTotal e valorParcela
   const valorBase = Number(formData.valor) || 0;
@@ -305,7 +318,7 @@ const VendasCarros = () => {
 
         try {
           await axios.post(`/api/vendas_carros/${vendaCriada.id}/contracts/generate`, {
-            idioma: idiomaContrato,
+            idiomas: idiomasContrato.length > 0 ? idiomasContrato : IDIOMAS_CONTRATO_PADRAO,
           });
         } catch (contractError) {
           console.error('Erro ao gerar contrato da venda de carro:', contractError);
@@ -761,16 +774,24 @@ const VendasCarros = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
-                <InputLabel>Idioma do Contrato</InputLabel>
+                <InputLabel>Idiomas do Contrato</InputLabel>
                 <Select
-                  value={idiomaContrato}
-                  label="Idioma do Contrato"
-                  onChange={(e) => setIdiomaContrato(e.target.value as 'pt' | 'ja')}
+                  multiple
+                  value={idiomasContrato}
+                  label="Idiomas do Contrato"
+                  renderValue={(selected) => (selected as IdiomaContrato[])
+                    .map((idioma) => IDIOMAS_CONTRATO_DISPONIVEIS.find((item) => item.value === idioma)?.label || idioma)
+                    .join(', ')}
+                  onChange={(e) => setIdiomasContrato(e.target.value as IdiomaContrato[])}
                 >
-                  <MenuItem value="pt">Português</MenuItem>
-                  <MenuItem value="ja">Japonês</MenuItem>
+                  {IDIOMAS_CONTRATO_DISPONIVEIS.map((idioma) => (
+                    <MenuItem key={idioma.value} value={idioma.value}>{idioma.label}</MenuItem>
+                  ))}
                 </Select>
               </FormControl>
+              <Typography variant="caption" color="text.secondary">
+                Padrão automático: Português + Japonês no mesmo PDF.
+              </Typography>
             </Grid>
             <Grid item xs={12}>
               <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
