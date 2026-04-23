@@ -269,12 +269,12 @@ updated_at → updatedAt
 
 ---
 
-## MAPEAMENTO JSON → DATABASE
+## MAPEAMENTO DE DADOS LEGADOS → DATABASE
 
-### Análise do db.json e Conformidade com Schema
+### Análise de conformidade com o schema atual
 
 ```json
-// db.json example (clientes)
+// exemplo de dados legados (clientes)
 {
   "clientes": [
     {

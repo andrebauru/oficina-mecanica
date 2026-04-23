@@ -19,15 +19,13 @@ npm-debug.log*
 
 # === Uploads (gerados em runtime) ===
 backend/storage/
+backend/uploads/
 public/uploads/
 
 # === Backups e arquivos temporários ===
 *.zip
 *.sql
 *.bak
-db.json
-db-copy.json
-db-*.json
 
 # === IDEs e SO ===
 .vscode/settings.json

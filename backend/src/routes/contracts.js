@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const { generateContractPdfBuffer } = require('../services/contractPdf');
 
 const router = express.Router();
-const CONTRACTS_DIR = path.join(__dirname, '../../storage/uploads/contracts');
+const CONTRACTS_DIR = path.join(__dirname, '../../uploads/contracts');
 const DEFAULT_CONTRACT_LANGUAGES = ['pt', 'ja'];
 const VALID_CONTRACT_LANGUAGES = ['pt', 'ja', 'fil', 'vi', 'id', 'en'];
 
@@ -22,7 +22,7 @@ function normalizeRelativeContractPath(absolutePath) {
 
 function resolveSafeAbsolutePath(relativePath) {
   const absolute = path.resolve(path.join(__dirname, '../../'), relativePath);
-  const base = path.resolve(path.join(__dirname, '../../storage/uploads/contracts'));
+  const base = path.resolve(path.join(__dirname, '../../uploads/contracts'));
   if (!absolute.startsWith(base)) return null;
   return absolute;
 }

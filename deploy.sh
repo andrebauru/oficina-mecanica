@@ -20,6 +20,14 @@ echo "🔄 Atualizando código..."
 git fetch --all
 git reset --hard origin/master
 
+# 2.1 Garantir estrutura e permissões seguras
+echo "🔐 Aplicando permissões e estrutura..."
+mkdir -p backend/uploads/contracts
+find . -type d -exec chmod 755 {} \;
+find . -type f -exec chmod 644 {} \;
+chmod -R 775 backend/uploads
+chmod +x deploy.sh
+
 # 3. Instalar dependências do Backend
 echo "📦 Instalando dependências do backend..."
 cd backend

@@ -44,8 +44,7 @@
 | Arquivo/Pasta | Motivo da Remoção |
 |---|---|
 | `backend2/` | Código legado, completamente substituído por `backend/` |
-| `db.json` | Banco de dados JSON estático — sistema migrado para MySQL |
-| `db-copy.json` | Cópia do banco JSON — obsoleto |
+| `arquivos de banco legado em JSON` | Estruturas estáticas removidas após migração total para MySQL |
 | `DASHBOARD-ENTREGA.html` | HTML avulso da versão antiga — substituído por `Contratos.tsx` |
 | `index-BgX3LbdG.js}` | Artefato de build corrompido (nome malformado) |
 | `FETCH_HEAD` | Arquivo Git colocado incorretamente na raiz do projeto |
