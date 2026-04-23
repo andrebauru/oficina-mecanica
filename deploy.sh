@@ -1,50 +1,38 @@
 #!/bin/bash
-
-# ============================================================
-# deploy.sh — Deploy no Servidor Linux (Hirata Cars)
-# Executar DENTRO do servidor: ./deploy.sh
-# ============================================================
-
-set -e
+# Hirata Cars - Script de Atualização Segura
 
 PROJECT_DIR="/var/www/oficina-mecanica"
-
-echo "🚀 Iniciando deploy — $(date '+%Y-%m-%d %H:%M:%S')"
-
-# 1. Entrar na pasta do projeto
 cd "$PROJECT_DIR"
-echo "📁 Diretório: $PROJECT_DIR"
 
-# 2. Atualizar código do repositório
-echo "🔄 Atualizando código..."
+echo "🛡️  Protegendo arquivo .env..."
+if [ -f "backend/.env" ]; then
+	cp backend/.env /tmp/.env.hirata.bak
+fi
+
+echo "🔄 Sincronizando com o GitHub..."
 git fetch --all
 git reset --hard origin/master
 
-# 2.1 Garantir estrutura e permissões seguras
-echo "🔐 Aplicando permissões e estrutura..."
+echo "♻️  Restaurando .env..."
+if [ -f "/tmp/.env.hirata.bak" ]; then
+	mv /tmp/.env.hirata.bak backend/.env
+	chmod 600 backend/.env
+fi
+
+echo "📦 Instalando dependências e Build..."
+cd backend && npm install && cd ..
+npm install
+npm run build
+
+echo "📂 Ajustando permissões para os Contratos Multilíngues..."
 mkdir -p backend/uploads/contracts
 find . -type d -exec chmod 755 {} \;
 find . -type f -exec chmod 644 {} \;
 chmod -R 775 backend/uploads
 chmod +x deploy.sh
 
-# 3. Instalar dependências do Backend
-echo "📦 Instalando dependências do backend..."
-cd backend
-npm install
-cd ..
-
-# 4. Instalar dependências do Frontend e fazer build
-echo "📦 Instalando dependências do frontend..."
-npm install
-
-echo "🔨 Compilando frontend..."
-npm run build
-
-# 5. Reiniciar serviço via PM2
-echo "♻️  Reiniciando serviço PM2..."
+echo "🚀 Reiniciando PM2..."
 pm2 restart hirata-backend
 pm2 save
 
-echo ""
-echo "✅ Deploy concluído com sucesso — $(date '+%Y-%m-%d %H:%M:%S')"
+echo "✅ Sistema Hirata Cars atualizado e protegido!"
