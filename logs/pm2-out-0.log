@@ -1,0 +1,87 @@
+2026-04-21 13:18:17: 
+=== HIRATA CARS BACKEND ===
+2026-04-21 13:18:17: [ROUTES] POST   /api/auth/login
+2026-04-21 13:18:17: [ROUTES] POST   /api/auth/register
+2026-04-21 13:18:17: [ROUTES] POST   /api/auth/logout
+2026-04-21 13:18:17: [ROUTES] GET    /api/health
+2026-04-21 13:18:17: [ROUTES] GET    /api/session
+2026-04-21 13:18:17: [ROUTES] GET    /api/logs
+2026-04-21 13:18:17: [ROUTES] POST   /api/logs/error
+2026-04-21 13:18:17: [ROUTES] GET/POST /emergency-user-management
+2026-04-21 13:18:17: [ROUTES] GET|POST|PUT|PATCH|DELETE /api/:collection
+2026-04-21 13:18:17: ===========================
+
+2026-04-21 13:18:17: [DB] Pool MySQL criado com sucesso.
+2026-04-21 13:18:17: ✅ MySQL conectado | Backend ativo na porta 3001
+2026-04-21 13:40:03: [BOOT] Verificando módulos críticos...
+2026-04-21 13:40:03: [BOOT] OK  express
+2026-04-21 13:40:03: [BOOT] OK  bcrypt
+2026-04-21 13:40:03: [BOOT] OK  cors
+2026-04-21 13:40:03: [BOOT] OK  jsonwebtoken
+2026-04-21 13:40:03: [BOOT] OK  express-session
+2026-04-21 13:40:03: [BOOT] OK  mysql2/promise
+2026-04-21 13:40:03: [ENV] Tentando conectar ao MySQL em: 127.0.0.1
+2026-04-21 13:40:03: [BOOT] OK  ./config/env
+2026-04-21 13:40:03: [BOOT] OK  ./config/database
+2026-04-21 13:40:03: [BOOT] OK  ./config/entities
+2026-04-21 13:40:03: [BOOT] OK  ./middleware/authMiddleware
+2026-04-21 13:40:03: [BOOT] OK  ./middleware/sessionTimeout
+2026-04-21 13:40:03: [BOOT] OK  ./middleware/loggingMiddleware
+2026-04-21 13:40:03: [BOOT] OK  ./routes/clientCrm
+2026-04-21 13:40:03: [BOOT] OK  ./routes/contracts
+2026-04-21 13:40:03: [BOOT] Verificação de módulos concluída.
+
+2026-04-21 13:40:04: 
+=== HIRATA CARS BACKEND ===
+2026-04-21 13:40:04: [ROUTES] POST   /api/auth/login
+2026-04-21 13:40:04: [ROUTES] POST   /api/auth/register
+2026-04-21 13:40:04: [ROUTES] POST   /api/auth/logout
+2026-04-21 13:40:04: [ROUTES] GET    /api/health
+2026-04-21 13:40:04: [ROUTES] GET    /api/session
+2026-04-21 13:40:04: [ROUTES] GET    /api/logs
+2026-04-21 13:40:04: [ROUTES] POST   /api/logs/error
+2026-04-21 13:40:04: [ROUTES] GET/POST /emergency-user-management
+2026-04-21 13:40:04: [ROUTES] GET|POST|PUT|PATCH|DELETE /api/:collection
+2026-04-21 13:40:04: ===========================
+
+2026-04-21 13:40:04: [DB] Pool MySQL conectado com sucesso.
+2026-04-21 13:40:04: [DB] Host: 127.0.0.1 | DB: hirata_cars | User: hirata_admin
+2026-04-21 13:40:04: ✅ MySQL conectado | Backend ativo na porta 3001
+2026-04-21 16:06:45: [DEBUG] GET /usuarios
+2026-04-21 16:06:45: [DEBUG] POST /logs/error
+2026-04-21 16:06:45: ℹ️  [2026-04-21T07:06:45.708Z] POST /logs/error
+2026-04-23 11:27:24: [DEBUG] GET /usuarios
+2026-04-23 11:27:33: [DEBUG] POST /logs/error
+2026-04-23 11:27:33: ℹ️  [2026-04-23T02:27:33.803Z] POST /logs/error
+2026-04-23 12:07:15: [DEBUG] GET /api/usuarios
+2026-04-23 12:07:15: ℹ️  [2026-04-23T03:07:15.210Z] GET /api/usuarios
+2026-04-23 12:07:15: [DEBUG] POST /api/logs/error
+2026-04-23 12:07:15: ℹ️  [2026-04-23T03:07:15.328Z] POST /api/logs/error
+2026-04-23 12:09:17: [DEBUG] GET /api/emergency-user-management
+2026-04-23 12:09:17: ℹ️  [2026-04-23T03:09:17.724Z] GET /api/emergency-user-management
+2026-04-23 12:10:28: [DEBUG] POST /api/auth/register
+2026-04-23 12:10:28: ℹ️  [2026-04-23T03:10:28.446Z] POST /api/auth/register
+2026-04-23 12:10:28: [DEBUG] POST /api/auth/login
+2026-04-23 12:10:28: ℹ️  [2026-04-23T03:10:28.670Z] POST /api/auth/login
+2026-04-23 12:10:28: [LOGIN] Tentativa para: admin@hiratacars.jp@hiratacars.jp | senhaHash presente: true
+2026-04-23 12:10:28: [LOGIN] Sucesso: admin@hiratacars.jp@hiratacars.jp
+2026-04-23 12:10:28: [DEBUG] GET /api/configuracoes
+2026-04-23 12:10:28: ℹ️  [2026-04-23T03:10:28.875Z] GET /api/configuracoes
+2026-04-23 12:10:28: [DEBUG] GET /api/clientes
+2026-04-23 12:10:28: ℹ️  [2026-04-23T03:10:28.973Z] GET /api/clientes
+2026-04-23 12:10:29: [DEBUG] GET /api/veiculos
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.063Z] GET /api/veiculos
+2026-04-23 12:10:29: [DEBUG] GET /api/ordens_servico
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.076Z] GET /api/ordens_servico
+2026-04-23 12:10:29: [DEBUG] GET /api/vendas_carros
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.084Z] GET /api/vendas_carros
+2026-04-23 12:10:29: [DEBUG] POST /api/logs/error
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.090Z] POST /api/logs/error
+2026-04-23 12:10:29: [DEBUG] POST /api/logs/error
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.096Z] POST /api/logs/error
+2026-04-23 12:10:29: [DEBUG] POST /api/logs/error
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.173Z] POST /api/logs/error
+2026-04-23 12:10:29: [DEBUG] POST /api/logs/error
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.182Z] POST /api/logs/error
+2026-04-23 12:10:29: [DEBUG] POST /api/logs/error
+2026-04-23 12:10:29: ℹ️  [2026-04-23T03:10:29.188Z] POST /api/logs/error
