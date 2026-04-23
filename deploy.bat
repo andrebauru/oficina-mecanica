@@ -15,19 +15,27 @@ set /p COMMIT_MSG="Mensagem do commit (Enter = 'chore: update'): "
 if "%COMMIT_MSG%"=="" set COMMIT_MSG=chore: update
 
 echo.
-echo [1/4] Adicionando todos os arquivos alterados...
+echo [1/5] Validando build local...
+call npm run build
+if errorlevel 1 (
+	echo ❌ Build falhou. Push cancelado.
+	exit /b 1
+)
+
+echo.
+echo [2/5] Adicionando todos os arquivos alterados...
 git add -A
 
 echo.
-echo [2/4] Criando commit: %COMMIT_MSG%
+echo [3/5] Criando commit: %COMMIT_MSG%
 git commit -m "%COMMIT_MSG%" || echo (nada novo para commitar, continuando...)
 
 echo.
-echo [3/4] Enviando para origin/master (--force)...
+echo [4/5] Enviando para origin/master (--force)...
 git push origin master --force
 
 echo.
-echo [4/4] Status atual do repositorio:
+echo [5/5] Status atual do repositorio:
 git log --oneline -5
 
 echo.

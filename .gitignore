@@ -35,3 +35,8 @@ Thumbs.db
 
 # === Misc ===
 .claude/
+
+# === Arquivos legados removidos ===
+install-backend.sh
+src/pages/DashboardEntrega.tsx
+backend2/
