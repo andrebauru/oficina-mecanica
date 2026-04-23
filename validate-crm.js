@@ -51,7 +51,7 @@ check('UUID instalado', pkg.dependencies.uuid !== undefined);
 
 // 4. Verificar rotas no server.js
 console.log('\n🛣️ Verificando Rotas...');
-const serverPath = path.join(__dirname, 'backend/src/server.js');
+const serverPath = path.join(__dirname, 'backend/server.js');
 const serverContent = fs.readFileSync(serverPath, 'utf-8');
 
 check('ClientCRM router importado', serverContent.includes('clientCrmRouter'));

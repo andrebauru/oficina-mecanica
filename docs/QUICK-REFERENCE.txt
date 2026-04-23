@@ -1,0 +1,390 @@
+================================================================================
+                    MAPA DE REFERÊNCIA RÁPIDA
+              Hirata Cars - Database Standardization
+================================================================================
+
+🗺️ CONVERSÕES POR TABELA - REFERÊNCIA RÁPIDA
+================================================================================
+
+┌─ CONFIGURACOES
+│  • senha_hash → senhaHash
+│  • nome_empresa → nomeEmpresa
+│  • numero_autorizacao → numeroAutorizacao
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ USUARIOS
+│  • senha_hash → senhaHash
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ CLIENTES
+│  • cnh_number → cnhNumber
+│  • passaporte_number → passaporteNumber
+│  • zairyu_card_number → zairyuCardNumber
+│  • my_number → myNumber
+│  • preferred_language → preferredLanguage
+│  • observacoes_gerais → observacoesGerais
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ VEICULOS
+│  • cliente_id → clienteId
+│  • data_venda → dataVenda
+│  • nova_placa → novaPlaca
+│  • data_transferencia → dataTransferencia
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ SERVICOS
+│  • tempo_estimado → tempoEstimado
+│  • valor: DECIMAL(12,2) → DECIMAL(15,2)
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ PECAS
+│  • modelo_compativel → modeloCompativel
+│  • preco: DECIMAL(12,2) → DECIMAL(15,2)
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ CATEGORIAS_FINANCEIRO
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ FINANCEIRO
+│  • categoria_id → categoriaId
+│  • valor: DECIMAL(12,2) → DECIMAL(15,2)
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ AGENDAMENTOS
+│  • cliente_id → clienteId
+│  • veiculo_id → veiculoId
+│  • data_agendamento → dataAgendamento
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ ORDENS_SERVICO ⚠️ CRÍTICA
+│  • veiculo_id → veiculoId
+│  • cliente_id → clienteId
+│  • data_entrada → dataEntrada
+│  • data_saida → dataSaida
+│  • servicos_ids_json → servicosIdsJson
+│  • pecas_ids_json → pecasIdsJson
+│  • valor_total: DECIMAL(12,2) → DECIMAL(15,2)
+│  • valor_base → valorBase
+│  • juros → juros
+│  • parcelas_status_json → parcelasStatusJson
+│  • pdf_path → pdfPath
+│  • pdf_lang → pdfLang
+│  • pdf_template → pdfTemplate
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ ORDEM_SERVICO_SERVICOS (Pivot)
+│  • ordem_servico_id → ordemServicoId
+│  • servico_id → servicoId
+
+├─ ORDEM_SERVICO_PECAS (Pivot)
+│  • ordem_servico_id → ordemServicoId
+│  • peca_id → pecaId
+
+├─ VENDAS_CARROS
+│  • cliente_id → clienteId
+│  • cliente_nome → clienteNome
+│  • cliente_telefone → clienteTelefone
+│  • cliente_endereco → clienteEndereco
+│  • valor: DECIMAL(12,2) → DECIMAL(15,2)
+│  • valor_pago → valorPago
+│  • valor_total → valorTotal
+│  • parcelas_status_json → parcelasStatusJson
+│  • recibo_pdf → reciboPdf
+│  • recibo_gerado_em → reciboGeradoEm
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ VENDAS ⚠️ CRÍTICA
+│  • cliente_id → clienteId
+│  • veiculo_id → veiculoId
+│  • cliente_nome_snapshot → clienteNomeSnapshot
+│  • cliente_telefone_snapshot → clienteTelefoneSnapshot
+│  • cliente_endereco_snapshot → clienteEnderecoSnapshot
+│  • data_venda → dataVenda
+│  • valor_total: DECIMAL(12,2) → DECIMAL(15,2)
+│  • valor_pago → valorPago
+│  • tipo_venda → tipoVenda
+│  • numero_parcelas → numeroParcelas
+│  • juros → juros
+│  • status_venda → statusVenda
+│  • foro_pagamento → foroPagamento
+│  • nome_contrato → nomeContrato
+│  • data_quitar → dataQuitar
+│  • recibo_pdf → reciboPdf
+│  • recibo_gerado_em → reciboGeradoEm
+│  • pdf_path → pdfPath
+│  • pdf_lang → pdfLang
+│  • pdf_template → pdfTemplate
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ PARCELAS ⚠️ CRÍTICA
+│  • venda_id → vendaId
+│  • numero_parcela → numeroParcela
+│  • valor: DECIMAL(12,2) → DECIMAL(15,2)
+│  • data_vencimento → dataVencimento
+│  • data_pagamento → dataPagamento
+│  • cliente_nome → clienteNome
+│  • cliente_telefone → clienteTelefone
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ DOCUMENTOS
+│  • entity_id → entityId
+│  • entity_type → entityType
+│  • referencia_id → referenciaId
+│  • referencia_tipo → referenciaTipo
+│  • arquivo_original → arquivoOriginal
+│  • data_upload → dataUpload
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ CLIENT_INTERACTIONS
+│  • client_id → clientId
+│  • interaction_text → interactionText
+│  • interaction_type → interactionType
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ CLIENT_DOCUMENTS
+│  • client_id → clientId
+│  • document_type → documentType
+│  • pdf_path → pdfPath
+│  • pdf_lang → pdfLang
+│  • tipo_anexo → tipoAnexo
+│  • related_entity_type → relatedEntityType
+│  • related_entity_id → relatedEntityId
+│  • mime_type → mimeType
+│  • is_generated → isGenerated
+│  • contract_photo → contractPhoto
+│  • file_size → fileSize
+│  • original_filename → originalFilename
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ VENDAS_PARCELAS
+│  • contrato_id → contratoId
+│  • client_id → clientId
+│  • numero_parcela → numeroParcela
+│  • valor: DECIMAL(12,2) → DECIMAL(15,2)
+│  • data_vencimento → dataVencimento
+│  • data_pagamento → dataPagamento
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+├─ ANEXOS
+│  • entidade_tipo → entidadeTipo
+│  • entidade_id → entidadeId
+│  • pdf_path → pdfPath
+│  • pdf_lang → pdfLang
+│  • tipo_anexo → tipoAnexo
+│  • filesize → fileSize
+│  • is_principal → isPrincipal
+│  • created_at → createdAt
+│  • updated_at → updatedAt
+
+└─ MENSAGENS_CHAT
+   • cliente_id → clienteId
+   • usuario_id → usuarioId
+   • tipo_mensagem → tipoMensagem
+   • data_leitura → dataLeitura
+   • is_arquivo → isArquivo
+   • arquivo_path → caminhoArquivo
+   • arquivo_tipo → tipoArquivo
+   • created_at → createdAt
+   • updated_at → updatedAt
+
+================================================================================
+
+⌨️ COMANDOS RÁPIDOS
+================================================================================
+
+BACKUP:
+  mysqldump -u root -p hirata_cars > backup_$(date +%Y%m%d_%H%M%S).sql
+
+PRÉ-VALIDAÇÃO:
+  php scripts/pre-validate-standardization.php
+
+EXECUTAR SCRIPT:
+  mysql -u root -p hirata_cars < scripts/standardize-camelcase.sql
+
+PÓS-VALIDAÇÃO:
+  php scripts/post-validate-standardization.php
+
+ROLLBACK:
+  mysql -u root -p hirata_cars < backup_20260421_143045.sql
+
+CONTAR UNDERSCORES RESTANTES:
+  mysql -u root -p hirata_cars -e "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'hirata_cars' AND COLUMN_NAME LIKE '%\_%';"
+
+LISTAR COLUNAS COM UNDERSCORES:
+  mysql -u root -p hirata_cars -e "SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'hirata_cars' AND COLUMN_NAME LIKE '%\_%' ORDER BY TABLE_NAME;"
+
+================================================================================
+
+🔗 DEPENDENCIES (Após Padronização)
+================================================================================
+
+ARQUIVOS A ATUALIZAR:
+  • backend/src/config/entities.js  ← Mapear camelCase → camelCase
+  • scripts/migrate_data.php        ← Usar novos nomes de coluna
+  • backend/src/routes/*.js         ← Se houver hardcoded column names
+
+NÃO ALTERAR:
+  • Qualquer coisa em frontend (usa API, não acessa DB diretamente)
+  • Qualquer coisa em src/utils (helpers não dependem de coluna names)
+
+================================================================================
+
+⏱️ TIMELINE DE EXECUÇÃO
+================================================================================
+
+  Total: 2-2.5 horas
+
+  ├─ Fase 0-1 (Prep+Backup):           25 min
+  │  └─ Verificação, parar app, mysqldump
+  │
+  ├─ Fase 2 (Pré-validação):            5 min
+  │  └─ Pre-validate script
+  │
+  ├─ Fase 3 (SQL principal):         20-30 min
+  │  └─ standardize-camelcase.sql
+  │
+  ├─ Fase 4 (Pós-validação):           5 min
+  │  └─ Post-validate script
+  │
+  ├─ Fase 5 (Rollback se necessário): 10-15 min
+  │  └─ mysqldump restore (só se error)
+  │
+  ├─ Fase 6 (Atualizar app):          30 min
+  │  └─ entities.js + migrate_data.php
+  │
+  ├─ Fase 7 (Reiniciar):              10 min
+  │  └─ npm start + npm run dev
+  │
+  └─ Fase 8-9 (Testes):               20-25 min
+     └─ API tests + UI tests
+
+================================================================================
+
+✅ GO-NO-GO CHECKLIST
+================================================================================
+
+  ANTES DE EXECUTAR - OBRIGATÓRIO:
+    ☐ Backup criado
+    ☐ Backup > 1MB
+    ☐ Backup armazenado em local seguro
+    ☐ MySQL rodando
+    ☐ Backend parado
+    ☐ Frontend parado
+    ☐ Terminal de monitoramento aberto
+    ☐ Pré-validação passou (✅ PRONTO)
+
+  DURANTE EXECUÇÃO:
+    ☐ SQL roda sem erros (Query OK...)
+    ☐ Tempo decorrido < 30 minutos
+    ☐ Nenhum ERROR 1064 ou similar
+    ☐ Nenhum ERROR 1452 (FK violation)
+
+  APÓS EXECUÇÃO:
+    ☐ Pós-validação passou (✅ SUCESSO)
+    ☐ Nenhum underscore remanescente
+    ☐ Todos os FKs listados
+    ☐ Todos os índices recriados
+
+  GO-LIVE:
+    ☐ entities.js atualizado
+    ☐ migrate_data.php atualizado
+    ☐ Backend iniciado (npm start)
+    ☐ Frontend iniciado (npm run dev)
+    ☐ Login funciona
+    ☐ Endpoints funcionam
+    ☐ PDFs gerados corretamente
+    ☐ Sem erros console
+
+================================================================================
+
+🚨 PROBLEMAS COMUNS & SOLUÇÕES
+================================================================================
+
+PROBLEMA                            SOLUÇÃO
+──────────────────────────────────────────────────────────────────────────
+MySQL não conecta                   systemctl start mysql
+                                    mysql -u root -p -e "SELECT 1;"
+
+ERROR 1064 no script SQL            Parar script, restaurar backup
+                                    Verificar linha exata do erro
+
+ERROR 1452 Foreign Key              Já tratado (SET FK_CHECKS = 0)
+                                    Se persistir: rollback completo
+
+Aplicação não conecta pós-          Verificar entities.js atualizado
+padronização                        Verificar .env credenciais
+                                    Reiniciar backend
+
+Underscores ainda existem           Rodar post-validate script
+                                    Executar ALTERs manuais
+                                    Contactar DBA
+
+Índices com nomes antigos           Normalizar via RENAME INDEX
+                                    Ou ignorar se funcionam
+
+================================================================================
+
+📞 SUPORTE RÁPIDO
+================================================================================
+
+Logs MySQL:
+  tail -100 /var/log/mysql/error.log
+
+Logs Backend:
+  pm2 logs (ou verificar console se desenvolvimento)
+
+Verificar Status FK:
+  SELECT @@FOREIGN_KEY_CHECKS;
+
+Verificar Conexão:
+  mysql -u root -p -e "SELECT VERSION();"
+
+Validar Sintaxe PHP:
+  php -l backend/src/config/entities.js
+
+Testar Endpoint:
+  curl http://localhost:3001/api/clientes
+
+================================================================================
+
+📁 ARQUIVOS FORNECIDOS
+================================================================================
+
+  ROOT:
+    d:\Programacao\oficina-mecanica\
+      ├─ scripts/
+      │  ├─ standardize-camelcase.sql (925 linhas)
+      │  ├─ pre-validate-standardization.php
+      │  └─ post-validate-standardization.php
+      │
+      └─ docs/
+         ├─ DATABASE-STANDARDIZATION-REPORT.md
+         ├─ EXECUTION-GUIDE.md
+         ├─ DATABASE-STANDARDIZATION.html
+         ├─ STANDARDIZATION-SUMMARY.txt
+         └─ QUICK-REFERENCE.txt (este arquivo)
+
+================================================================================
+
+Versão: 1.0
+Data: 21 de Abril de 2026
+Status: ✅ PRONTO PARA EXECUÇÃO
+
+================================================================================

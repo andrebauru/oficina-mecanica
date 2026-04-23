@@ -79,7 +79,7 @@ const requiredFiles = [
   'backend/src/config/upload.js',
   'backend/src/routes/clientCrm.js',
   'backend/src/middleware/sessionTimeout.js',
-  'backend/src/server.js',
+  'backend/server.js',
   'src/pages/Veiculos.tsx',
   'src/pages/Clientes.tsx',
   'src/components/ClientCrmDialog.tsx',
@@ -410,7 +410,7 @@ if (fs.existsSync(crmRoutesPath)) {
 // ============================================================================
 console.log('\n1️⃣1️⃣  VERIFICANDO SERVER.JS\n');
 
-const serverPath = path.join(projectRoot, 'backend/src/server.js');
+const serverPath = path.join(projectRoot, 'backend/server.js');
 if (fs.existsSync(serverPath)) {
   const serverContent = fs.readFileSync(serverPath, 'utf8');
   

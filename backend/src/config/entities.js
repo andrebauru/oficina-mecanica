@@ -23,6 +23,9 @@ const collectionConfig = {
       idioma: 'idioma',
       senhaHash: 'senha_hash',
     },
+    // senhaHash é necessário para verificação client-side no login;
+    // removido das respostas GET genéricas para não expor desnecessariamente
+    sensitiveFields: ['senhaHash'],
   },
   clientes: {
     table: 'clientes',
@@ -252,12 +255,13 @@ function toDatabaseRecord(entityName, clientRecord) {
   return dbRecord;
 }
 
-function toClientRecord(entityName, dbRecord) {
+function toClientRecord(entityName, dbRecord, { includeSensitive = false } = {}) {
   const entity = collectionConfig[entityName];
   if (!entity) throw new Error(`Entidade não mapeada: ${entityName}`);
 
   const clientRecord = {};
   for (const [clientKey, dbKey] of Object.entries(entity.fields)) {
+    if (!includeSensitive && (entity.sensitiveFields || []).includes(clientKey)) continue;
     const value = dbRecord[dbKey];
 
     if ((entity.jsonFields || []).includes(clientKey)) {

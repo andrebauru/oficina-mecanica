@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd d:\\\\Programacao\\\\oficina-mecanica ; git add backend/src/server\\.js backend/src/config/database\\.js oficina-backend\\.service deploy\\.sh deploy\\.bat ; git commit -m \"fix\\(critical\\): try-catch no login, process\\.exit\\(1\\) no DB, rotas registradas no startup, deploy atualizado para Node\\.js/MySQL\" ; git push origin master$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

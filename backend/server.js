@@ -1,21 +1,61 @@
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
-const env = require('./config/env');
-const { testConnection, query } = require('./config/database');
-const { sessionTimeout, ONE_HOUR_MS } = require('./middleware/sessionTimeout');
+const crypto = require('crypto');
+const env = require('./src/config/env');
+const { testConnection, query } = require('./src/config/database');
+const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout');
 const {
   collectionConfig,
   toDatabaseRecord,
   toClientRecord,
   allowedFilterMap,
-} = require('./config/entities');
-const clientCrmRouter = require('./routes/clientCrm');
-const contractsRouter = require('./routes/contracts');
+} = require('./src/config/entities');
+const clientCrmRouter = require('./src/routes/clientCrm');
+const contractsRouter = require('./src/routes/contracts');
+
+// ─── Utilitários de senha (espelho de src/utils/security.ts) ──────────────────
+function legacyHashPassword(str) {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+}
+
+function verifyPassword(senha, storedHash) {
+  if (!storedHash) return false;
+  if (storedHash.startsWith('sha256:')) {
+    const parts = storedHash.split(':');
+    const salt = parts[1];
+    const digest = parts[2];
+    if (!salt || !digest) return false;
+    const calculated = crypto.createHash('sha256').update(`${salt}:${senha}`).digest('hex');
+    return calculated === digest;
+  }
+  return legacyHashPassword(senha) === storedHash;
+}
+
+function upgradePasswordHash(senha) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const digest = crypto.createHash('sha256').update(`${salt}:${senha}`).digest('hex');
+  return `sha256:${salt}:${digest}`;
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const app = express();
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => callback(null, origin || true),
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie'],
+}));
 app.use(express.json({ limit: '20mb' }));
 app.use(session({
   secret: env.sessionSecret,
@@ -30,6 +70,18 @@ app.use(session({
   },
 }));
 app.use(sessionTimeout);
+
+// Middleware de autenticação: bloqueia mutações sem sessão ativa
+const AUTH_PUBLIC_PATHS = ['/api/auth/login', '/api/auth/logout', '/api/session', '/api/health'];
+function requireAuth(req, res, next) {
+  if (req.method === 'GET') return next();
+  if (AUTH_PUBLIC_PATHS.some(p => req.path === p)) return next();
+  if (!req.session?.user) {
+    return res.status(401).json({ message: 'Não autenticado. Faça login para continuar.' });
+  }
+  next();
+}
+app.use(requireAuth);
 
 // Usar rotas de CRM de clientes
 app.use('/api', clientCrmRouter);
@@ -54,9 +106,9 @@ app.get('/api/session', (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const { nome } = req.body || {};
-  if (!nome) {
-    return res.status(400).json({ message: 'Nome de usuário é obrigatório' });
+  const { nome, senha } = req.body || {};
+  if (!nome || !senha) {
+    return res.status(400).json({ message: 'Nome e senha são obrigatórios' });
   }
 
   const rows = await query(
@@ -64,8 +116,14 @@ app.post('/api/auth/login', async (req, res) => {
     [nome]
   );
   const user = rows[0];
-  if (!user) {
-    return res.status(401).json({ message: 'Usuário não encontrado' });
+  if (!user || !verifyPassword(senha, user.senhaHash)) {
+    return res.status(401).json({ message: 'Usuário ou senha inválidos' });
+  }
+
+  // Auto-upgrade de hash legado para sha256
+  if (user.senhaHash && !user.senhaHash.startsWith('sha256:')) {
+    const newHash = upgradePasswordHash(senha);
+    await query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [newHash, user.id]).catch(() => {});
   }
 
   req.session.user = {

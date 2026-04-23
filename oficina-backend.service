@@ -1,16 +1,18 @@
 [Unit]
-Description=Oficina Mecânica - Backend API (json-server)
-After=network.target
+Description=Hirata Cars - Backend API (Node.js/MySQL)
+After=network.target mysql.service
+Wants=mysql.service
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/var/www/oficina-mecanica
-ExecStart=/usr/bin/npx json-server --watch db.json --port 3001
+WorkingDirectory=/var/www/hiratacars.jp/backend
+ExecStart=/usr/bin/node /var/www/hiratacars.jp/backend/server.js
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
+EnvironmentFile=/var/www/hiratacars.jp/backend/.env
 
 # Recursos
 MemoryMax=512M

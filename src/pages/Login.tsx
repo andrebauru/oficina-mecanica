@@ -12,25 +12,8 @@ import {
 import LockIcon from '@mui/icons-material/Lock';
 import HirataLogo from '../assets/Hirata Logo.svg';
 import { useLanguage } from '../components/LanguageContext';
-import { hashPassword, needsPasswordUpgrade, verifyPassword } from '../utils/security';
+import { hashPassword } from '../utils/security';
 import { startSession } from '../utils/session';
-
-interface Configuracao {
-  id: string;
-  senhaHash?: string;
-  nomeEmpresa?: string;
-  endereco?: string;
-  telefone?: string;
-  numeroAutorizacao?: string;
-}
-
-interface UsuarioLogin {
-  id: string;
-  nome: string;
-  email: string;
-  idioma: string;
-  senhaHash?: string;
-}
 
 interface LoginProps {
   onLogin: () => void;
@@ -38,27 +21,19 @@ interface LoginProps {
 
 const Login = ({ onLogin }: LoginProps) => {
   const { t } = useLanguage();
-  const [users, setUsers] = useState<UsuarioLogin[]>([]);
-  const [config, setConfig] = useState<Configuracao | null>(null);
+  const [primeiroUso, setPrimeiroUso] = useState(false);
   const [loading, setLoading] = useState(true);
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmar, setConfirmar] = useState('');
   const [erro, setErro] = useState('');
-  const [primeiroUso, setPrimeiroUso] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      axios.get('/api/usuarios').catch(() => ({ data: [] })),
-      axios.get('/api/configuracoes').catch(() => ({ data: [] })),
-    ]).then(([usersRes, configRes]) => {
-      const loadedUsers: UsuarioLogin[] = usersRes.data;
-      setUsers(loadedUsers);
-      const configItems: Configuracao[] = configRes.data;
-      if (configItems.length > 0) setConfig(configItems[0]);
-      if (loadedUsers.length === 0) setPrimeiroUso(true);
-    }).finally(() => setLoading(false));
+    axios.get('/api/usuarios')
+      .then(res => setPrimeiroUso(res.data.length === 0))
+      .catch(() => setPrimeiroUso(false))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = async () => {
@@ -72,39 +47,27 @@ const Login = ({ onLogin }: LoginProps) => {
         if (senha !== confirmar) { setErro(t('senhasNaoConferem')); setSalvando(false); return; }
         if (senha.length < 4) { setErro(t('senhaMinima')); setSalvando(false); return; }
 
+        // Cria o primeiro usuário com hash gerado client-side
         await axios.post('/api/usuarios', {
           nome: usuario.trim(),
           email: '',
           idioma: 'pt',
-          senhaHash: await hashPassword(senha)
+          senhaHash: await hashPassword(senha),
         });
-        if (config?.id) {
-          await axios.put(`/api/configuracoes/${config.id}`, { ...config });
-        }
-        startSession();
-        onLogin();
       } else {
         if (!usuario.trim()) { setErro(t('digiteUsuario')); setSalvando(false); return; }
-        const found = users.find(u => u.nome === usuario.trim());
-        if (found) {
-          const senhaValida = await verifyPassword(senha, found.senhaHash);
-          if (!senhaValida) {
-            setErro(t('usuarioSenhaInvalidos'));
-            return;
-          }
-
-          if (needsPasswordUpgrade(found.senhaHash)) {
-            await axios.patch(`/api/usuarios/${found.id}`, { senhaHash: await hashPassword(senha) }).catch(() => {});
-          }
-
-          startSession();
-          onLogin();
-        } else {
-          setErro(t('usuarioSenhaInvalidos'));
-        }
       }
-    } catch {
-      setErro(t('erroServidorLogin'));
+
+      // Autenticação server-side: cria sessão no servidor
+      await axios.post('/api/auth/login', { nome: usuario.trim(), senha });
+      startSession();
+      onLogin();
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setErro(t('usuarioSenhaInvalidos'));
+      } else {
+        setErro(t('erroServidorLogin'));
+      }
     } finally {
       setSalvando(false);
     }
