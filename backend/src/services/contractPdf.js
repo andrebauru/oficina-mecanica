@@ -1,4 +1,8 @@
+const fs = require('fs');
+const path = require('path');
 const PDFDocument = require('pdfkit');
+
+const BLANK_FIELD = '________________________';
 
 const LANGUAGE_LOCALES = {
   pt: 'pt-BR',
@@ -8,6 +12,74 @@ const LANGUAGE_LOCALES = {
   id: 'id-ID',
   en: 'en-US',
 };
+
+const FONT_CANDIDATES = {
+  regular: [
+    path.resolve(__dirname, '../../assets/fonts/NotoSansJP-Regular.ttf'),
+    path.resolve(__dirname, '../../assets/fonts/NotoSansCJKjp-Regular.otf'),
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+    'C:/Windows/Fonts/msgothic.ttc',
+    'C:/Windows/Fonts/meiryo.ttc',
+  ],
+  bold: [
+    path.resolve(__dirname, '../../assets/fonts/NotoSansJP-Bold.ttf'),
+    path.resolve(__dirname, '../../assets/fonts/NotoSansCJKjp-Bold.otf'),
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
+    'C:/Windows/Fonts/meiryob.ttc',
+  ],
+};
+
+function findFirstExisting(paths) {
+  return paths.find((p) => {
+    try {
+      return fs.existsSync(p);
+    } catch {
+      return false;
+    }
+  }) || null;
+}
+
+function registerUnicodeFonts(doc) {
+  const regularPath = findFirstExisting(FONT_CANDIDATES.regular);
+  const boldPath = findFirstExisting(FONT_CANDIDATES.bold) || regularPath;
+
+  if (regularPath) {
+    doc.registerFont('unicodeRegular', regularPath);
+    if (boldPath) {
+      doc.registerFont('unicodeBold', boldPath);
+    }
+    return {
+      regular: 'unicodeRegular',
+      bold: boldPath ? 'unicodeBold' : 'unicodeRegular',
+    };
+  }
+
+  console.warn('[contractPdf] Fonte Unicode/CJK não encontrada. Usando fallback padrão.');
+  return { regular: 'Helvetica', bold: 'Helvetica-Bold' };
+}
+
+function safeField(value, { allowEmpty = false } = {}) {
+  if (value === null || value === undefined) return allowEmpty ? '' : BLANK_FIELD;
+  const normalized = String(value).trim();
+  if (!normalized) return allowEmpty ? '' : BLANK_FIELD;
+  return normalized;
+}
+
+function ensureSpace(doc, requiredHeight = 80) {
+  const available = doc.page.height - doc.page.margins.bottom - doc.y;
+  if (available < requiredHeight) {
+    doc.addPage();
+  }
+}
+
+function resolveLogoPath() {
+  const candidates = [
+    path.resolve(__dirname, '../../../public/Hirata Logo.png'),
+    path.resolve(__dirname, '../../assets/Hirata Logo.png'),
+  ];
+  return findFirstExisting(candidates);
+}
 
 function formatCurrency(value) {
   const number = Number(value || 0);
@@ -20,20 +92,20 @@ function formatCurrency(value) {
 }
 
 function toDateBR(value) {
-  if (!value) return '-';
+  if (!value) return BLANK_FIELD;
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '-';
+  if (Number.isNaN(d.getTime())) return BLANK_FIELD;
   return d.toLocaleDateString('pt-BR');
 }
 
 function getVehicleData(venda, veiculo) {
   return {
-    fabricante: venda?.fabricante || veiculo?.marca || '-',
-    modelo: venda?.modelo || veiculo?.modelo || '-',
-    ano: venda?.ano || veiculo?.ano || '-',
-    chassi: venda?.chassi || veiculo?.chassi || '-',
-    placa: venda?.placa || veiculo?.placa || '-',
-    km: venda?.kilometragem || veiculo?.kilometragem || '-',
+    fabricante: safeField(venda?.fabricante || veiculo?.marca),
+    modelo: safeField(venda?.modelo || veiculo?.modelo),
+    ano: safeField(venda?.ano || veiculo?.ano),
+    chassi: safeField(venda?.chassi || veiculo?.chassi),
+    placa: safeField(venda?.placa || veiculo?.placa),
+    km: safeField(venda?.kilometragem || veiculo?.kilometragem),
   };
 }
 
@@ -283,18 +355,22 @@ function templateByLanguage(idioma = 'pt') {
   return templates[idioma] || templates.pt;
 }
 
-function writeSectionTitle(doc, title) {
+function writeSectionTitle(doc, fonts, title) {
+  ensureSpace(doc, 50);
   doc.moveDown(0.7);
-  doc.fontSize(11.5).fillColor('#000').text(title, { underline: true });
+  doc.font(fonts.bold).fontSize(11.5).fillColor('#000').text(title, { underline: true });
   doc.moveDown(0.2);
 }
 
-function writeParagraph(doc, text) {
-  doc.fontSize(10.5).fillColor('#111').text(text, { align: 'justify' });
+function writeParagraph(doc, fonts, text) {
+  if (!text) return;
+  ensureSpace(doc, 30);
+  doc.font(fonts.regular).fontSize(10.5).fillColor('#111').text(text, { align: 'justify' });
   doc.moveDown(0.2);
 }
 
-function drawInstallmentsTable(doc, headers, installments) {
+function drawInstallmentsTable(doc, fonts, headers, installments) {
+  ensureSpace(doc, 320);
   const startX = doc.page.margins.left;
   const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const rowHeight = 18;
@@ -306,6 +382,7 @@ function drawInstallmentsTable(doc, headers, installments) {
     for (let i = 0; i < rowData.length; i += 1) {
       doc.rect(x, y, colWidths[i], rowHeight).stroke('#333');
       doc
+        .font(isHeader ? fonts.bold : fonts.regular)
         .fontSize(isHeader ? 9.5 : 9)
         .fillColor('#000')
         .text(String(rowData[i] || ''), x + 4, y + 5, {
@@ -329,29 +406,43 @@ function drawInstallmentsTable(doc, headers, installments) {
 function renderLanguageSection(doc, template, payload, idioma, isFirstPage) {
   if (!isFirstPage) doc.addPage();
 
+  const fonts = payload.fonts;
+
   const locale = LANGUAGE_LOCALES[idioma] || 'pt-BR';
   const generatedAt = new Date().toLocaleString(locale);
-  const cidade = payload.configuracao?.cidadeContrato || template.cityLabel;
-  const empresaNome = payload.configuracao?.nomeEmpresa || 'Hirata Cars';
-  const empresaTelefone = payload.configuracao?.telefone || '-';
-  const empresaAutorizacao = payload.configuracao?.numeroAutorizacao || '-';
-  const empresaEndereco = payload.configuracao?.endereco || '-';
-  const empresaNacionalidade = payload.configuracao?.nacionalidade || 'Não informado';
-  const empresaProfissao = payload.configuracao?.profissao || 'Não informado';
-  const empresaEstadoCivil = payload.configuracao?.estadoCivil || 'Não informado';
-  const compradorNome = payload.cliente?.nome || payload.venda?.cliente_nome || 'Comprador';
-  const compradorEndereco = payload.cliente?.endereco || '-';
-  const compradorDoc = payload.cliente?.cnh_number || '-';
-  const compradorNacionalidade = payload.cliente?.nacionalidade || 'Não informado';
-  const compradorProfissao = payload.cliente?.profissao || 'Não informado';
-  const compradorEstadoCivil = payload.cliente?.estado_civil || payload.cliente?.estadoCivil || 'Não informado';
+  const cidade = safeField(payload.configuracao?.cidadeContrato || template.cityLabel);
+  const empresaNome = safeField(payload.configuracao?.nomeEmpresa || 'Hirata Cars');
+  const empresaTelefone = safeField(payload.configuracao?.telefone);
+  const empresaAutorizacao = safeField(payload.configuracao?.numeroAutorizacao);
+  const empresaEndereco = safeField(payload.configuracao?.endereco);
+  const empresaNacionalidade = safeField(payload.configuracao?.nacionalidade);
+  const empresaProfissao = safeField(payload.configuracao?.profissao);
+  const empresaEstadoCivil = safeField(payload.configuracao?.estadoCivil);
+  const compradorNome = safeField(payload.cliente?.nome || payload.venda?.cliente_nome || 'Comprador');
+  const compradorEndereco = safeField(payload.cliente?.endereco);
+  const compradorDoc = safeField(payload.cliente?.cnh_number);
+  const compradorNacionalidade = safeField(payload.cliente?.nacionalidade);
+  const compradorProfissao = safeField(payload.cliente?.profissao);
+  const compradorEstadoCivil = safeField(payload.cliente?.estado_civil || payload.cliente?.estadoCivil);
 
-  doc.fontSize(15).text(template.title, { align: 'center' });
+  const logoPath = resolveLogoPath();
+  if (logoPath) {
+    try {
+      doc.image(logoPath, doc.page.margins.left, doc.y, { fit: [72, 72] });
+    } catch {
+      // segue sem logo
+    }
+  }
+
+  doc.font(fonts.bold).fontSize(16).text('Hirata Cars', { align: 'center' });
+  doc.font(fonts.regular).fontSize(10.2).text(`Tel: ${empresaTelefone} | 古物商許可: ${empresaAutorizacao}`, { align: 'center' });
   doc.moveDown(0.5);
-  doc.fontSize(10.2).text(`${empresaNome}  |  Tel: ${empresaTelefone}  |  古物商許可: ${empresaAutorizacao}`, { align: 'center' });
+
+  doc.font(fonts.bold).fontSize(15).text(template.title, { align: 'center' });
+  doc.moveDown(0.5);
   doc.moveDown(0.8);
 
-  doc.fontSize(10.5).text(`De um lado, ${empresaNome}`);
+  doc.font(fonts.regular).fontSize(10.5).text(`De um lado, ${empresaNome}`);
   doc.fontSize(10.2).text(`(${empresaNacionalidade}) (${empresaProfissao}) (${empresaEstadoCivil})`);
   doc.fontSize(10.2).text(`(Zairyo Card: ${empresaAutorizacao}) (${empresaEndereco})`);
   doc.fontSize(10.2).text(`neste ato denominado ${template.sellerLabel}`);
@@ -362,56 +453,61 @@ function renderLanguageSection(doc, template, payload, idioma, isFirstPage) {
   doc.fontSize(10.2).text(`(Zairyo Card: ${compradorDoc}) (${compradorEndereco})`);
   doc.fontSize(10.2).text(`denominado ${template.buyerLabel}`);
   doc.moveDown(0.4);
-  writeParagraph(doc, template.texts.intro);
+  writeParagraph(doc, fonts, template.texts.intro);
 
-  writeSectionTitle(doc, template.clause1);
-  writeParagraph(doc, template.texts.object);
+  writeSectionTitle(doc, fonts, template.clause1);
+  writeParagraph(doc, fonts, template.texts.object);
   writeParagraph(
     doc,
+    fonts,
     `• ${payload.veiculo.fabricante} | ${payload.veiculo.modelo} | ${payload.veiculo.ano} | Chassi: ${payload.veiculo.chassi} | Placa: ${payload.veiculo.placa} | KM: ${payload.veiculo.km}`
   );
-  writeParagraph(doc, template.texts.objectP1);
-  writeParagraph(doc, template.texts.objectP2);
+  writeParagraph(doc, fonts, template.texts.objectP1);
+  writeParagraph(doc, fonts, template.texts.objectP2);
 
-  writeSectionTitle(doc, template.clause2);
-  writeParagraph(doc, template.texts.clause2);
-  writeParagraph(doc, template.texts.clause2p);
+  writeSectionTitle(doc, fonts, template.clause2);
+  writeParagraph(doc, fonts, template.texts.clause2);
+  writeParagraph(doc, fonts, template.texts.clause2p);
 
-  writeSectionTitle(doc, template.clause3);
-  writeParagraph(doc, template.texts.clause3);
-  writeParagraph(doc, template.texts.clause3p);
+  writeSectionTitle(doc, fonts, template.clause3);
+  writeParagraph(doc, fonts, template.texts.clause3);
+  writeParagraph(doc, fonts, template.texts.clause3p);
 
-  writeSectionTitle(doc, template.clause4);
-  writeParagraph(doc, template.texts.clause4);
-  writeParagraph(doc, `Preço Total: ${formatCurrency(payload.pagamento.total)}`);
-  writeParagraph(doc, `SINAL: ${formatCurrency(payload.pagamento.sinal)} | PARCELAS: ${payload.pagamento.totalParcelas}x de ${formatCurrency(payload.pagamento.valorParcela)}`);
-  drawInstallmentsTable(doc, template.paymentTableHeaders, payload.pagamento.installments);
-  writeParagraph(doc, template.texts.clause4p1);
-  writeParagraph(doc, template.texts.clause4p2);
-  writeParagraph(doc, template.texts.clause4p3);
+  writeSectionTitle(doc, fonts, template.clause4);
+  writeParagraph(doc, fonts, template.texts.clause4);
+  writeParagraph(doc, fonts, `Preço Total: ${formatCurrency(payload.pagamento.total)}`);
+  writeParagraph(doc, fonts, `SINAL: ${formatCurrency(payload.pagamento.sinal)} | PARCELAS: ${payload.pagamento.totalParcelas}x de ${formatCurrency(payload.pagamento.valorParcela)}`);
+  drawInstallmentsTable(doc, fonts, template.paymentTableHeaders, payload.pagamento.installments);
+  writeParagraph(doc, fonts, template.texts.clause4p1);
+  writeParagraph(doc, fonts, template.texts.clause4p2);
+  writeParagraph(doc, fonts, template.texts.clause4p3);
 
-  writeSectionTitle(doc, template.clause6);
-  writeParagraph(doc, template.texts.clause6);
-  writeParagraph(doc, template.texts.clause6p1);
-  writeParagraph(doc, template.texts.clause6p2);
-  writeParagraph(doc, template.texts.clause6p3);
+  writeSectionTitle(doc, fonts, template.clause6);
+  writeParagraph(doc, fonts, template.texts.clause6);
+  writeParagraph(doc, fonts, template.texts.clause6p1);
+  writeParagraph(doc, fonts, template.texts.clause6p2);
+  writeParagraph(doc, fonts, template.texts.clause6p3);
 
-  writeSectionTitle(doc, template.clause7);
-  writeParagraph(doc, template.texts.clause7);
+  writeSectionTitle(doc, fonts, template.clause7);
+  writeParagraph(doc, fonts, template.texts.clause7);
 
-  writeSectionTitle(doc, template.clause8);
-  writeParagraph(doc, template.texts.clause8);
+  writeSectionTitle(doc, fonts, template.clause8);
+  writeParagraph(doc, fonts, template.texts.clause8);
 
+  ensureSpace(doc, 220);
   doc.moveDown(1);
-  doc.fontSize(10).fillColor('#333').text(`${cidade}, ${toDateBR(new Date())}`);
+  doc.font(fonts.regular).fontSize(10).fillColor('#333').text(`${cidade}, ${toDateBR(new Date())}`);
   doc.moveDown(1.4);
-  doc.text('____________________________________');
-  doc.text(empresaNome);
+  doc.text('____________________________________    ____________________________________');
+  doc.text('Comprador                                 Vendedor');
+  doc.moveDown(1.1);
+  doc.text('____________________________________    ____________________________________');
+  doc.text('Testemunha 1                              Testemunha 2');
   doc.moveDown(1.1);
   doc.text('____________________________________');
-  doc.text(compradorNome);
+  doc.text('Espaço para Carimbo (Inkan)');
   doc.moveDown(0.8);
-  doc.fontSize(9).fillColor('#666').text(`${template.generatedAt}: ${generatedAt}`);
+  doc.font(fonts.regular).fontSize(9).fillColor('#666').text(`${template.generatedAt}: ${generatedAt}`);
 }
 
 function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, cliente, veiculo, configuracao }) {
@@ -427,6 +523,7 @@ function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, cliente, vei
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 42, size: 'A4' });
     const chunks = [];
+    const fonts = registerUnicodeFonts(doc);
 
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -434,7 +531,7 @@ function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, cliente, vei
 
     selectedLanguages.forEach((idioma, index) => {
       const template = templateByLanguage(idioma);
-      renderLanguageSection(doc, template, payload, idioma, index === 0);
+      renderLanguageSection(doc, template, { ...payload, fonts }, idioma, index === 0);
     });
 
     doc.end();
