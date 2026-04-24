@@ -84,23 +84,23 @@ function templateByLanguage(idioma = 'pt') {
       paymentTableHeaders: ['PRESTAÇÕES', 'DATA', 'VALOR', 'MULTA'],
       texts: {
         intro: 'Tem entre os mesmos, de maneira justa e acordada, o presente CONTRATO PARTICULAR DE COMPRA E VENDA DE VEÍCULO/AUTOMÓVEL USADO, ficando desde já aceito, pelas cláusulas abaixo descritas.',
-        object: 'O presente tem como OBJETO o veículo/automóvel nas seguintes condições acordadas: Marca, Modelo, Ano, Chassi, Placa e Quilometragem.',
+        object: 'O presente tem como OBJETO o veículo/automóvel nas seguintes condições acordadas: descrever detalhadamente o veículo.',
         objectP1: 'Parágrafo primeiro. O veículo/automóvel, objeto do presente contrato, é usado, apresentando um desgaste e envelhecimento inerentes aos seus anos e quilometragem.',
         objectP2: 'Parágrafo segundo. Antes da sua revenda, o DIRETOR inspecionou o veículo/automóvel e verificou as suas condições de funcionamento, corrigindo as anomalias detectadas, não inerentes ao desgaste e envelhecimento do veículo.',
         clause2: 'Sem prejuízo do disposto no parágrafo primeiro da cláusula 1ª, o DIRETOR responde pelo bom estado e bom funcionamento do veículo, pelo prazo de 3 meses para motor e câmbio, a contar da data da sua entrega.',
-        clause2p: 'Parágrafo único. A exceção de garantia somente é aplicável a elementos que não se relacionem, direta ou indiretamente, com a segurança do veículo.',
+        clause2p: 'Parágrafo único. A exceção prevista no caput da presente cláusula somente é aplicável a elementos que não se relacionem, direta ou indiretamente, com a segurança do veículo e cuja ausência ou deformação não impeçam a satisfação dos fins a que se destina.',
         clause3: 'É dever do COMPRADOR verificar, até ao momento da entrega do veículo automóvel, se o mesmo se encontra nas condições negociadas.',
-        clause3p: 'Parágrafo único. Qualquer substituição de peças e/ou componentes não indispensáveis à segurança e ao bom funcionamento do veículo dependerá de pedido escrito do COMPRADOR e eventual revisão do preço.',
-        clause4: 'O COMPRADOR concorda em realizar o pagamento do preço total do automóvel, com sinal e parcelas conforme quadro abaixo.',
-        clause4p1: 'Parágrafo primeiro. Na determinação do preço supramencionado foram fatores relevantes: uso, desgaste e quilometragem do veículo.',
+        clause3p: 'Parágrafo único. Qualquer substituição de peças e/ou componentes, além daquelas que forem efetuadas na inspeção referida, e que não constituam elementos indispensáveis à segurança e ao bom funcionamento do veículo, apenas será efetuada mediante pedido escrito do COMPRADOR e eventual revisão do preço pago na venda do veículo automóvel.',
+        clause4: 'O COMPRADOR concorda em realizar o pagamento do preço total do automóvel, sendo que este valor será dividido em SINAL e PARCELAS conforme tabela abaixo.',
+        clause4p1: 'Parágrafo primeiro. Na determinação do preço supramencionados foram fatores relevantes à sua fixação: o fato de não ser um veículo novo, o uso e desgaste do veículo e a quilometragem do mesmo.',
         clause4p2: 'Parágrafo segundo. O preço não inclui os custos inerentes à formalização da transmissão de propriedade.',
-        clause4p3: 'Parágrafo terceiro. O veículo é vendido livre de quaisquer ônus ou encargos.',
-        clause6: 'Perante qualquer anomalia verificada no veículo, o COMPRADOR deverá denunciá-la ao VENDEDOR no prazo legal aplicável.',
+        clause4p3: 'Parágrafo terceiro. Sem prejuízo do disposto nas cláusulas anteriores, o veículo é vendido livre de quaisquer ônus ou encargos.',
+        clause6: 'Perante qualquer anomalia verificada no veículo, o COMPRADOR deverá denunciá-la ao VENDEDOR no prazo de prazo para reclamação de anomalias dias, após o seu conhecimento.',
         clause6p1: 'Parágrafo primeiro. O DIRETOR não se responsabiliza pela utilização negligente do veículo automóvel ou por defeitos resultantes de manutenção por oficinas não recomendadas.',
-        clause6p2: 'Parágrafo segundo. O COMPRADOR deverá manter o histórico de revisões e faturas de manutenção.',
+        clause6p2: 'Parágrafo segundo. O COMPRADOR deverá fazer carimbar o livro de revisões do veículo ou fazer a sua prova mediante documento escrito e respectivas faturas.',
         clause6p3: 'Parágrafo terceiro. O veículo será entregue nas instalações do DIRETOR, salvo convenção escrita em contrário.',
-        clause7: 'A Escritura de Compra e Venda será formalizada após a quitação da última parcela.',
-        clause8: 'O presente contrato passa a vigorar entre as partes a partir da assinatura. As partes elegem o foro da cidade contratada para dirimir dúvidas deste instrumento.',
+        clause7: 'A Escritura de Compra e Venda será formalizada até o dia útil após o pagamento da última parcela, quando as mesmas estiverem devidamente quitadas.',
+        clause8: 'O presente contrato passa a vigorar entre as partes a partir da assinatura do mesmo, as quais elegem o foro da cidade contratada, para dirimirem quaisquer dúvidas provenientes da execução e cumprimento do mesmo. Os herdeiros ou sucessores das partes contratantes se obrigam desde já ao inteiro teor deste contrato.',
       },
     },
     ja: {
@@ -335,18 +335,32 @@ function renderLanguageSection(doc, template, payload, idioma, isFirstPage) {
   const empresaNome = payload.configuracao?.nomeEmpresa || 'Hirata Cars';
   const empresaTelefone = payload.configuracao?.telefone || '-';
   const empresaAutorizacao = payload.configuracao?.numeroAutorizacao || '-';
+  const empresaEndereco = payload.configuracao?.endereco || '-';
+  const empresaNacionalidade = payload.configuracao?.nacionalidade || 'Não informado';
+  const empresaProfissao = payload.configuracao?.profissao || 'Não informado';
+  const empresaEstadoCivil = payload.configuracao?.estadoCivil || 'Não informado';
   const compradorNome = payload.cliente?.nome || payload.venda?.cliente_nome || 'Comprador';
   const compradorEndereco = payload.cliente?.endereco || '-';
   const compradorDoc = payload.cliente?.cnh_number || '-';
+  const compradorNacionalidade = payload.cliente?.nacionalidade || 'Não informado';
+  const compradorProfissao = payload.cliente?.profissao || 'Não informado';
+  const compradorEstadoCivil = payload.cliente?.estado_civil || payload.cliente?.estadoCivil || 'Não informado';
 
   doc.fontSize(15).text(template.title, { align: 'center' });
   doc.moveDown(0.5);
   doc.fontSize(10.2).text(`${empresaNome}  |  Tel: ${empresaTelefone}  |  古物商許可: ${empresaAutorizacao}`, { align: 'center' });
   doc.moveDown(0.8);
 
-  doc.fontSize(10.5).text(`${template.sellerLabel}: ${empresaNome}`);
-  doc.fontSize(10.5).text(`${template.buyerLabel}: ${compradorNome}`);
-  doc.fontSize(10.2).text(`Documento: ${compradorDoc} | Endereço: ${compradorEndereco}`);
+  doc.fontSize(10.5).text(`De um lado, ${empresaNome}`);
+  doc.fontSize(10.2).text(`(${empresaNacionalidade}) (${empresaProfissao}) (${empresaEstadoCivil})`);
+  doc.fontSize(10.2).text(`(Zairyo Card: ${empresaAutorizacao}) (${empresaEndereco})`);
+  doc.fontSize(10.2).text(`neste ato denominado ${template.sellerLabel}`);
+  doc.moveDown(0.4);
+
+  doc.fontSize(10.5).text(`Do outro lado, ${compradorNome}`);
+  doc.fontSize(10.2).text(`(${compradorNacionalidade}) (${compradorProfissao}) (${compradorEstadoCivil})`);
+  doc.fontSize(10.2).text(`(Zairyo Card: ${compradorDoc}) (${compradorEndereco})`);
+  doc.fontSize(10.2).text(`denominado ${template.buyerLabel}`);
   doc.moveDown(0.4);
   writeParagraph(doc, template.texts.intro);
 
@@ -369,7 +383,8 @@ function renderLanguageSection(doc, template, payload, idioma, isFirstPage) {
 
   writeSectionTitle(doc, template.clause4);
   writeParagraph(doc, template.texts.clause4);
-  writeParagraph(doc, `Preço Total: ${formatCurrency(payload.pagamento.total)} | Sinal: ${formatCurrency(payload.pagamento.sinal)} | Parcelas: ${payload.pagamento.totalParcelas}x de ${formatCurrency(payload.pagamento.valorParcela)}`);
+  writeParagraph(doc, `Preço Total: ${formatCurrency(payload.pagamento.total)}`);
+  writeParagraph(doc, `SINAL: ${formatCurrency(payload.pagamento.sinal)} | PARCELAS: ${payload.pagamento.totalParcelas}x de ${formatCurrency(payload.pagamento.valorParcela)}`);
   drawInstallmentsTable(doc, template.paymentTableHeaders, payload.pagamento.installments);
   writeParagraph(doc, template.texts.clause4p1);
   writeParagraph(doc, template.texts.clause4p2);

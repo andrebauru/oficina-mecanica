@@ -85,7 +85,7 @@ router.get('/vendas_carros/pending-delivery', async (_req, res) => {
        FROM vendas_carros v
        LEFT JOIN clientes c ON c.id = v.clienteId
        WHERE v.contratoPath IS NULL OR v.contratoPath = ''
-       ORDER BY v.created_at DESC`
+         ORDER BY v.id DESC`
     );
 
     return res.json(rows || []);
@@ -121,7 +121,7 @@ router.get('/vendas_carros/contracts/generated', async (_req, res) => {
        FROM vendas_carros v
        LEFT JOIN clientes c ON c.id = v.clienteId
        WHERE v.contratoPath IS NOT NULL AND v.contratoPath <> ''
-       ORDER BY v.contratoGeradoEm DESC`
+         ORDER BY v.id DESC`
     );
 
     return res.json(rows || []);
