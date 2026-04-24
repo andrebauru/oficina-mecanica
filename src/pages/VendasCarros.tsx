@@ -35,6 +35,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import DescriptionIcon from '@mui/icons-material/Description';
 import DownloadIcon from '@mui/icons-material/Download';
+import ArticleIcon from '@mui/icons-material/Article';
 import { useSearchParams } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatters';
 import HirataLogo from '../assets/Hirata Logo.svg';
@@ -43,7 +44,7 @@ import { sanitizeMultilineText, sanitizeNumber, sanitizeText } from '../utils/se
 import { useLanguage } from '../components/LanguageContext';
 
 interface VendaCarro {
-  id: number;
+  id: string;
   valor: number;
   valorPago?: number;
   fabricante: string;
@@ -82,6 +83,15 @@ interface ConfiguracaoEmpresa {
   endereco?: string;
   telefone?: string;
   numeroAutorizacao?: string;
+}
+
+interface VeiculoCadastro {
+  id: string;
+  clienteId?: string;
+  marca: string;
+  modelo: string;
+  ano?: number;
+  kilometragem?: number;
 }
 
 type IdiomaContrato = 'pt' | 'ja' | 'fil' | 'vi' | 'id' | 'en';
@@ -123,8 +133,8 @@ const VendasCarros = () => {
   const [openForm, setOpenForm] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
   const [formData, setFormData] = useState<VendaCarroFormData>(vendaCarroVazio);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [vendaCarroParaDeletar, setVendaCarroParaDeletar] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [vendaCarroParaDeletar, setVendaCarroParaDeletar] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -140,6 +150,8 @@ const VendasCarros = () => {
   });
   const [clientes, setClientes] = useState<Array<{id: string; nome: string; telefone?: string; endereco?: string}>>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<{id: string; nome: string; telefone?: string; endereco?: string} | null>(null);
+  const [veiculosCadastrados, setVeiculosCadastrados] = useState<VeiculoCadastro[]>([]);
+  const [veiculoSelecionadoId, setVeiculoSelecionadoId] = useState('');
   const [configEmpresa, setConfigEmpresa] = useState<ConfiguracaoEmpresa>({});
   const [idiomasContrato, setIdiomasContrato] = useState<IdiomaContrato[]>(IDIOMAS_CONTRATO_PADRAO);
 
@@ -167,15 +179,26 @@ const VendasCarros = () => {
     }
   };
 
+  const recarregarVeiculosDisponiveis = async () => {
+    try {
+      const response = await axios.get('/api/veiculos');
+      setVeiculosCadastrados(response.data || []);
+    } catch {
+      // sem bloqueio de fluxo
+    }
+  };
+
   useEffect(() => {
     fetchVendasCarros();
     Promise.all([
       axios.get('/api/clientes').catch(() => ({ data: [] })),
-      axios.get('/api/configuracoes').catch(() => ({ data: [] }))
+      axios.get('/api/configuracoes').catch(() => ({ data: [] })),
+      axios.get('/api/veiculos').catch(() => ({ data: [] })),
     ])
-      .then(([clientesRes, configRes]) => {
+      .then(([clientesRes, configRes, veiculosRes]) => {
         setClientes(clientesRes.data);
         setConfigEmpresa(configRes.data?.[0] || {});
+        setVeiculosCadastrados(veiculosRes.data || []);
       })
       .catch(() => {});
   }, []);
@@ -198,6 +221,8 @@ const VendasCarros = () => {
   }, [formData.clienteId, clientes]);
 
   const handleOpenForm = (vendaCarro?: VendaCarro) => {
+    recarregarVeiculosDisponiveis();
+
     if (vendaCarro) {
       setFormData({
         valor: vendaCarro.valor,
@@ -217,11 +242,87 @@ const VendasCarros = () => {
       setEditingId(null);
     }
     setClienteSelecionado(null);
+    setVeiculoSelecionadoId('');
     setOpenForm(true);
   };
 
   const handleCloseForm = () => {
     setOpenForm(false);
+    setVeiculoSelecionadoId('');
+  };
+
+  const handleGerarContrato = async (vendaId: string) => {
+    try {
+      await axios.post(`/api/vendas_carros/${vendaId}/contracts/generate`, {
+        idiomas: idiomasContrato.length > 0 ? idiomasContrato : IDIOMAS_CONTRATO_PADRAO,
+      });
+      setSnackbar({
+        open: true,
+        message: 'Contrato gerado com sucesso.',
+        severity: 'success',
+      });
+      fetchVendasCarros();
+    } catch (error) {
+      console.error('Erro ao gerar contrato da venda de carro:', error);
+      setSnackbar({
+        open: true,
+        message: 'Erro ao gerar contrato da venda.',
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleVisualizarContrato = async (vendaId: string) => {
+    try {
+      const response = await axios.get(`/api/vendas_carros/${vendaId}/contracts/view`, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        setSnackbar({
+          open: true,
+          message: 'Arquivo do contrato não foi encontrado. Gere/Regere o contrato novamente.',
+          severity: 'warning',
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Erro ao visualizar contrato.',
+          severity: 'error',
+        });
+      }
+    }
+  };
+
+  const handleDownloadContrato = async (venda: VendaCarro) => {
+    try {
+      const response = await axios.get(`/api/vendas_carros/${venda.id}/contracts/download`, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contrato_${(venda.clienteNome || `${venda.fabricante}_${venda.modelo}`).replace(/\s+/g, '_')}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        setSnackbar({
+          open: true,
+          message: 'Arquivo do contrato não foi encontrado. Gere/Regere o contrato novamente.',
+          severity: 'warning',
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Erro ao baixar contrato.',
+          severity: 'error',
+        });
+      }
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -317,9 +418,21 @@ const VendasCarros = () => {
         }
 
         try {
-          await axios.post(`/api/vendas_carros/${vendaCriada.id}/contracts/generate`, {
+          const contractResponse = await axios.post(`/api/vendas_carros/${vendaCriada.id}/contracts/generate`, {
             idiomas: idiomasContrato.length > 0 ? idiomasContrato : IDIOMAS_CONTRATO_PADRAO,
           });
+
+          if (contractResponse.data?.downloadUrl) {
+            const downloadBlob = await axios.get(contractResponse.data.downloadUrl, {
+              responseType: 'blob',
+            });
+            const url = URL.createObjectURL(new Blob([downloadBlob.data], { type: 'application/pdf' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `contrato_${(clienteSelecionado?.nome || formData.clienteNome || 'cliente').replace(/\s+/g, '_')}.pdf`;
+            link.click();
+            URL.revokeObjectURL(url);
+          }
         } catch (contractError) {
           console.error('Erro ao gerar contrato da venda de carro:', contractError);
         }
@@ -342,7 +455,7 @@ const VendasCarros = () => {
     }
   };
 
-  const handleOpenDelete = (id: number) => {
+  const handleOpenDelete = (id: string) => {
     setVendaCarroParaDeletar(id);
     setOpenDelete(true);
   };
@@ -474,6 +587,28 @@ const VendasCarros = () => {
         />
       </Box>
 
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+          Idiomas para gerar/regerar contrato
+        </Typography>
+        <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 380 } }}>
+          <InputLabel>Idiomas do Contrato</InputLabel>
+          <Select
+            multiple
+            value={idiomasContrato}
+            label="Idiomas do Contrato"
+            renderValue={(selected) => (selected as IdiomaContrato[])
+              .map((idioma) => IDIOMAS_CONTRATO_DISPONIVEIS.find((item) => item.value === idioma)?.label || idioma)
+              .join(', ')}
+            onChange={(e) => setIdiomasContrato(e.target.value as IdiomaContrato[])}
+          >
+            {IDIOMAS_CONTRATO_DISPONIVEIS.map((idioma) => (
+              <MenuItem key={idioma.value} value={idioma.value}>{idioma.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Paper>
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <CircularProgress />
@@ -483,7 +618,6 @@ const VendasCarros = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
                 <TableCell>
                   <TableSortLabel
                     active={ordenacao.campo === 'valor'}
@@ -553,7 +687,6 @@ const VendasCarros = () => {
                         '&:hover': { filter: 'brightness(0.96)' },
                       }}
                     >
-                      <TableCell>{vendaCarro.id}</TableCell>
                       <TableCell>{formatCurrency(vendaCarro.valor)}</TableCell>
                       <TableCell>{vendaCarro.fabricante}</TableCell>
                       <TableCell>{vendaCarro.modelo}</TableCell>
@@ -583,13 +716,24 @@ const VendasCarros = () => {
                         </Box>
                       </TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                        <IconButton
+                          color="warning"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGerarContrato(vendaCarro.id);
+                          }}
+                          size="small"
+                          title={vendaCarro.contratoPath ? 'Regerar contrato' : 'Gerar contrato'}
+                        >
+                          <ArticleIcon />
+                        </IconButton>
                         {vendaCarro.contratoPath && (
                           <>
                             <IconButton
                               color="secondary"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(`/api/vendas_carros/${vendaCarro.id}/contracts/view`, '_blank');
+                                handleVisualizarContrato(vendaCarro.id);
                               }}
                               size="small"
                               title="Visualizar contrato"
@@ -600,7 +744,7 @@ const VendasCarros = () => {
                               color="secondary"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(`/api/vendas_carros/${vendaCarro.id}/contracts/download`, '_blank');
+                                handleDownloadContrato(vendaCarro);
                               }}
                               size="small"
                               title="Baixar contrato"
@@ -629,7 +773,7 @@ const VendasCarros = () => {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">
+                  <TableCell colSpan={7} align="center">
                     {t('nenhumaVenda')}
                   </TableCell>
                 </TableRow>
@@ -644,6 +788,42 @@ const VendasCarros = () => {
         <DialogTitle>{editingId ? 'Editar Venda de Carro' : 'Nova Venda de Carro'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Veículo já cadastrado (opcional)</InputLabel>
+                <Select
+                  value={veiculoSelecionadoId}
+                  label="Veículo já cadastrado (opcional)"
+                  onChange={(e) => {
+                    const veiculoId = e.target.value;
+                    setVeiculoSelecionadoId(veiculoId);
+                    const veiculo = veiculosCadastrados.find((item) => item.id === veiculoId);
+                    if (!veiculo) return;
+
+                    const clienteByVeiculo = veiculo.clienteId
+                      ? clientes.find((c) => c.id === veiculo.clienteId)
+                      : undefined;
+
+                    setFormData((prev) => ({
+                      ...prev,
+                      clienteId: veiculo.clienteId || prev.clienteId,
+                      clienteNome: clienteByVeiculo?.nome || prev.clienteNome,
+                      fabricante: veiculo.marca || prev.fabricante,
+                      modelo: veiculo.modelo || prev.modelo,
+                      ano: veiculo.ano ?? prev.ano,
+                      kilometragem: veiculo.kilometragem ?? prev.kilometragem,
+                    }));
+                  }}
+                >
+                  <MenuItem value=""><em>Não usar pré-preenchimento</em></MenuItem>
+                  {veiculosCadastrados.map((veiculo) => (
+                    <MenuItem key={veiculo.id} value={veiculo.id}>
+                      {veiculo.marca} {veiculo.modelo} {veiculo.ano ? `(${veiculo.ano})` : ''}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
                 <InputLabel>Cliente (Comprador)</InputLabel>

@@ -350,7 +350,6 @@ const Veiculos = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
                 <TableCell>
                   <TableSortLabel
                     active={ordenacao.campo === 'clienteId'}
@@ -425,7 +424,6 @@ const Veiculos = () => {
                     onClick={() => handleOpenForm(veiculo)}
                     sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(25,118,210,0.06)' } }}
                   >
-                    <TableCell>{veiculo.id}</TableCell>
                     <TableCell>{getClienteNome(veiculo.clienteId)}</TableCell>
                     <TableCell>{veiculo.marca}</TableCell>
                     <TableCell>{veiculo.modelo}</TableCell>
@@ -469,7 +467,7 @@ const Veiculos = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     {t('nenhumRegistro')}
                   </TableCell>
                 </TableRow>

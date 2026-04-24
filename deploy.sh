@@ -28,6 +28,7 @@ npm run build
 
 echo "📂 Ajustando permissões para os Contratos Multilíngues..."
 mkdir -p backend/uploads/contracts
+mkdir -p backend/uploads/customer_images
 chmod -R 775 backend/uploads
 
 echo "⚙️  Garantindo permissão de execução do deploy..."

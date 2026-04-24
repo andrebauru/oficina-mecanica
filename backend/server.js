@@ -65,6 +65,52 @@ async function resolveUserPasswordColumn() {
   return cachedUserPasswordColumn;
 }
 
+let veiculosColumnsResolved = false;
+let veiculosResolvePromise = null;
+
+async function resolveOptionalColumn(tableName, candidates) {
+  const placeholders = candidates.map(() => '?').join(', ');
+  const rows = await query(
+    `SELECT COLUMN_NAME
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME IN (${placeholders})
+     ORDER BY FIELD(COLUMN_NAME, ${placeholders})
+     LIMIT 1`,
+    [tableName, ...candidates, ...candidates]
+  );
+  return rows[0]?.COLUMN_NAME || null;
+}
+
+async function ensureVeiculosColumnsCompatibility() {
+  if (veiculosColumnsResolved) return;
+  if (!veiculosResolvePromise) {
+    veiculosResolvePromise = (async () => {
+      const veiculosFields = ENTITY_ROUTES.veiculos.fields;
+      const fallbackMap = {
+        clienteId: ['clienteId', 'cliente_id'],
+        data_venda: ['data_venda', 'dataVenda'],
+        nova_placa: ['nova_placa', 'novaPlaca'],
+        data_transferencia: ['data_transferencia', 'dataTransferencia'],
+        created_at: ['created_at', 'createdAt'],
+        updated_at: ['updated_at', 'updatedAt'],
+      };
+
+      for (const [clientField, candidates] of Object.entries(fallbackMap)) {
+        const resolved = await resolveOptionalColumn('veiculos', candidates);
+        if (resolved) {
+          veiculosFields[clientField] = resolved;
+        }
+      }
+
+      veiculosColumnsResolved = true;
+    })();
+  }
+
+  await veiculosResolvePromise;
+}
+
 const ENTITY_ROUTES = {
   configuracoes: {
     table: 'configuracoes',
@@ -412,7 +458,14 @@ async function getEntityById(resource, id, { includeSensitive = false } = {}) {
 function registerEntityRoutes(resource, entityDef) {
   const basePath = `/api/${resource}`;
 
+  const ensureResourceCompatibility = async () => {
+    if (resource === 'veiculos') {
+      await ensureVeiculosColumnsCompatibility();
+    }
+  };
+
   app.get(basePath, safeRoute(async (req, res) => {
+    await ensureResourceCompatibility();
     const columns = selectColumns(entityDef);
     const { whereClause, params } = filterToWhere(entityDef, req.query);
     const rows = await query(
@@ -423,12 +476,14 @@ function registerEntityRoutes(resource, entityDef) {
   }));
 
   app.get(`${basePath}/:id`, safeRoute(async (req, res) => {
+    await ensureResourceCompatibility();
     const found = await getEntityById(resource, req.params.id);
     if (!found) return res.status(404).json({ message: 'Registro não encontrado' });
     return res.json(found);
   }));
 
   app.post(basePath, safeRoute(async (req, res) => {
+    await ensureResourceCompatibility();
     const dbPayload = toDbPayload(entityDef, req.body || {});
     if (!dbPayload[entityDef.idColumn]) {
       dbPayload[entityDef.idColumn] = generateId(entityDef.idPrefix);
@@ -448,6 +503,7 @@ function registerEntityRoutes(resource, entityDef) {
   }));
 
   app.put(`${basePath}/:id`, safeRoute(async (req, res) => {
+    await ensureResourceCompatibility();
     const current = await getEntityById(resource, req.params.id, { includeSensitive: true });
     if (!current) return res.status(404).json({ message: 'Registro não encontrado' });
 
@@ -466,6 +522,7 @@ function registerEntityRoutes(resource, entityDef) {
   }));
 
   app.patch(`${basePath}/:id`, safeRoute(async (req, res) => {
+    await ensureResourceCompatibility();
     const current = await getEntityById(resource, req.params.id, { includeSensitive: true });
     if (!current) return res.status(404).json({ message: 'Registro não encontrado' });
 
@@ -483,6 +540,7 @@ function registerEntityRoutes(resource, entityDef) {
   }));
 
   app.delete(`${basePath}/:id`, safeRoute(async (req, res) => {
+    await ensureResourceCompatibility();
     const existing = await getEntityById(resource, req.params.id, { includeSensitive: true });
     if (!existing) return res.status(404).json({ message: 'Registro não encontrado' });
 

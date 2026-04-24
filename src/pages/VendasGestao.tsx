@@ -132,7 +132,12 @@ export const VendasGestao: React.FC = () => {
       ]);
 
       setParcelas(parcelasRes.data);
-      setVendas(vendasRes.data);
+      const vendasOrdenadas = [...(vendasRes.data || [])].sort((a, b) => {
+        const aNum = Number(String(a.id || '').replace(/\D/g, '')) || 0;
+        const bNum = Number(String(b.id || '').replace(/\D/g, '')) || 0;
+        return bNum - aNum;
+      });
+      setVendas(vendasOrdenadas);
     } catch (err) {
       const mensagem = err instanceof Error ? err.message : 'Erro ao carregar dados';
       setErro(mensagem);
@@ -476,7 +481,7 @@ export const VendasGestao: React.FC = () => {
           {/* Filtros */}
           <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <TextField
-              placeholder="Buscar por cliente, telefone ou ID..."
+              placeholder="Buscar por cliente ou telefone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="small"
@@ -511,16 +516,6 @@ export const VendasGestao: React.FC = () => {
               <TableHead sx={{ bgcolor: '#1565c0' }}>
                 <TableRow>
                   <TableCell sx={{ color: '#fff', fontWeight: 700 }}>
-                    <TableSortLabel
-                      active={sortBy === 'id'}
-                      direction={sortBy === 'id' ? sortDir : 'asc'}
-                      onClick={() => handleSort('id')}
-                      sx={{ color: '#fff !important', '& .MuiTableSortLabel-icon': { color: '#fff !important' } }}
-                    >
-                      ID Venda
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell sx={{ color: '#fff', fontWeight: 700 }}>
                     <TableSortLabel active={sortBy === 'cliente'} direction={sortBy === 'cliente' ? sortDir : 'asc'} onClick={() => handleSort('cliente')} sx={{ color: '#fff !important', '& .MuiTableSortLabel-icon': { color: '#fff !important' } }}>
                       Cliente
                     </TableSortLabel>
@@ -546,7 +541,7 @@ export const VendasGestao: React.FC = () => {
               <TableBody>
                 {vendasAgrupadas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                       <Typography color="textSecondary">{t('nenhumaVendaEncontrada')}</Typography>
                     </TableCell>
                   </TableRow>
@@ -564,9 +559,6 @@ export const VendasGestao: React.FC = () => {
                           backgroundColor: venda.statusGeral === 'atrasado' ? '#fff5f5' : venda.statusGeral === 'pago' ? '#f9fff9' : 'inherit'
                         }}
                       >
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', fontFamily: 'monospace', color: '#555' }}>
-                          {venda.vendaId}
-                        </TableCell>
                         <TableCell>
                           <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>{venda.clienteNome}</Typography>

@@ -276,7 +276,6 @@ const Pecas = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
                 <TableCell>
                   <TableSortLabel
                     active={ordenacao.campo === 'nome'}
@@ -333,7 +332,6 @@ const Pecas = () => {
                     onClick={() => handleOpenForm(peca)}
                     sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(25,118,210,0.06)' } }}
                   >
-                    <TableCell>{peca.id}</TableCell>
                     <TableCell>{peca.nome}</TableCell>
                     <TableCell>{peca.codigo}</TableCell>
                     <TableCell>{peca.marca}</TableCell>
@@ -359,7 +357,7 @@ const Pecas = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={6} align="center">
                     {t('nenhumRegistro')}
                   </TableCell>
                 </TableRow>

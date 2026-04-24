@@ -19,6 +19,7 @@ import {
   CircularProgress,
   Alert,
   Stack,
+  TextField,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -30,6 +31,7 @@ interface VendaContrato {
   fabricante: string;
   modelo: string;
   ano: number;
+  placa?: string;
   valorTotal: number;
   created_at?: string;
   contratoPath?: string;
@@ -62,9 +64,10 @@ const Contratos = () => {
   const [erro, setErro] = useState('');
   const [pendentes, setPendentes] = useState<VendaContrato[]>([]);
   const [gerados, setGerados] = useState<VendaContrato[]>([]);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(1);
   const [idiomasSelecionados, setIdiomasSelecionados] = useState<IdiomaContrato[]>(IDIOMAS_PADRAO);
   const [processandoId, setProcessandoId] = useState<string | null>(null);
+  const [buscaGerados, setBuscaGerados] = useState('');
 
   const carregar = async () => {
     try {
@@ -92,6 +95,24 @@ const Contratos = () => {
     pendentes: pendentes.length,
     gerados: gerados.length,
   }), [pendentes.length, gerados.length]);
+
+  const geradosFiltrados = useMemo(() => {
+    const termo = buscaGerados.trim().toLowerCase();
+    if (!termo) return gerados;
+
+    return gerados.filter((item) => {
+      const cliente = String(item.clienteNome || '').toLowerCase();
+      const placa = String(item.placa || '').toLowerCase();
+      const dataGerado = item.contratoGeradoEm
+        ? new Date(item.contratoGeradoEm).toLocaleDateString('pt-BR').toLowerCase()
+        : '';
+      const dataCreated = item.created_at
+        ? new Date(item.created_at).toLocaleDateString('pt-BR').toLowerCase()
+        : '';
+
+      return cliente.includes(termo) || placa.includes(termo) || dataGerado.includes(termo) || dataCreated.includes(termo);
+    });
+  }, [gerados, buscaGerados]);
 
   const handleGerarContrato = async (vendaId: string) => {
     const idiomas = idiomasSelecionados.length > 0 ? idiomasSelecionados : IDIOMAS_PADRAO;
@@ -199,6 +220,17 @@ const Contratos = () => {
           <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
             Padrão profissional: Português + Japonês no mesmo PDF.
           </Typography>
+
+          {tab === 1 && (
+            <TextField
+              size="small"
+              fullWidth
+              sx={{ mt: 1.5, maxWidth: 460 }}
+              label="Pesquisar (Cliente, Data ou Placa)"
+              value={buscaGerados}
+              onChange={(e) => setBuscaGerados(e.target.value)}
+            />
+          )}
         </Box>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>
           <Tab label={`Pendentes (${resumo.pendentes})`} />
@@ -268,18 +300,19 @@ const Contratos = () => {
               <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell><strong>Cliente</strong></TableCell>
                 <TableCell><strong>Veículo</strong></TableCell>
+                <TableCell><strong>Placa</strong></TableCell>
                 <TableCell align="right"><strong>Valor (JPY)</strong></TableCell>
                 <TableCell><strong>Gerado em</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {gerados.length === 0 ? (
+              {geradosFiltrados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                     Nenhum contrato gerado ainda.
                   </TableCell>
                 </TableRow>
-              ) : gerados.map((item) => {
+              ) : geradosFiltrados.map((item) => {
                 return (
                   <TableRow key={item.id} hover>
                     <TableCell>{item.clienteNome}</TableCell>
@@ -289,6 +322,7 @@ const Contratos = () => {
                         {item.ano}
                       </Typography>
                     </TableCell>
+                    <TableCell>{item.placa || '—'}</TableCell>
                     <TableCell align="right">
                       <strong>{formatJPY(item.valorTotal)}</strong>
                     </TableCell>

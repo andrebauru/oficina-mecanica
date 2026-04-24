@@ -924,7 +924,6 @@ const OrdensServico = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
                 <TableCell>
                   <TableSortLabel
                     active={ordenacao.campo === 'veiculoId'}
@@ -982,7 +981,6 @@ const OrdensServico = () => {
                       '&:hover': { filter: 'brightness(0.96)' },
                     }}
                   >
-                    <TableCell>{ordem.id}</TableCell>
                     <TableCell>{getClienteInfo(ordem.veiculoId)}</TableCell>
                     <TableCell>{getVeiculoInfo(ordem.veiculoId)}</TableCell>
                     <TableCell>{new Date(ordem.dataEntrada).toLocaleDateString('pt-BR')}</TableCell>
@@ -1043,7 +1041,7 @@ const OrdensServico = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={6} align="center">
                     Nenhuma ordem de serviço cadastrada
                   </TableCell>
                 </TableRow>

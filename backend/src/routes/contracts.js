@@ -69,6 +69,15 @@ router.get('/vendas_carros/pending-delivery', async (_req, res) => {
         v.fabricante,
         v.modelo,
         v.ano,
+        COALESCE(v.placa,
+          (SELECT ve.placa
+           FROM veiculos ve
+           WHERE (v.clienteId IS NULL OR ve.clienteId = v.clienteId)
+             AND ve.marca = v.fabricante
+             AND ve.modelo = v.modelo
+           ORDER BY COALESCE(ve.updated_at, ve.created_at) DESC
+           LIMIT 1)
+        ) AS placa,
         v.valor_total AS valorTotal,
         v.created_at,
         v.contratoPath,
@@ -97,6 +106,15 @@ router.get('/vendas_carros/contracts/generated', async (_req, res) => {
         v.fabricante,
         v.modelo,
         v.ano,
+        COALESCE(v.placa,
+          (SELECT ve.placa
+           FROM veiculos ve
+           WHERE (v.clienteId IS NULL OR ve.clienteId = v.clienteId)
+             AND ve.marca = v.fabricante
+             AND ve.modelo = v.modelo
+           ORDER BY COALESCE(ve.updated_at, ve.created_at) DESC
+           LIMIT 1)
+        ) AS placa,
         v.valor_total AS valorTotal,
         v.contratoPath,
         v.contratoGeradoEm
@@ -137,6 +155,18 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       : [];
     const cliente = clienteRows[0] || null;
 
+    const veiculoRows = await query(
+      `SELECT *
+       FROM veiculos
+       WHERE (? IS NULL OR clienteId = ?)
+         AND marca = ?
+         AND modelo = ?
+       ORDER BY COALESCE(updated_at, created_at) DESC
+       LIMIT 1`,
+      [venda.clienteId || null, venda.clienteId || null, venda.fabricante || '', venda.modelo || '']
+    );
+    const veiculo = veiculoRows[0] || null;
+
     const configRows = await query('SELECT * FROM configuracoes ORDER BY createdAt DESC LIMIT 1');
     const configuracao = configRows[0] || null;
 
@@ -151,6 +181,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       idiomas,
       venda,
       cliente,
+      veiculo,
       configuracao,
     });
 

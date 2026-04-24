@@ -342,7 +342,6 @@ const Servicos = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
                 <TableCell>
                   <TableSortLabel
                     active={ordenacao.campo === 'nome'}
@@ -390,7 +389,6 @@ const Servicos = () => {
                     onClick={() => handleOpenForm(servico)}
                     sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(25,118,210,0.06)' } }}
                   >
-                    <TableCell>{servico.id}</TableCell>
                     <TableCell>{servico.nome}</TableCell>
                     <TableCell>{servico.descricao}</TableCell>
                     <TableCell>{formatCurrency(servico.valor)}</TableCell>
@@ -418,7 +416,7 @@ const Servicos = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={5} align="center">
                     {t('nenhumRegistro')}
                   </TableCell>
                 </TableRow>
