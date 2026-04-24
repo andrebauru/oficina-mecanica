@@ -4,6 +4,30 @@
 
 ---
 
+## [v2.7.0] — 2026-04-24 — Troca de Motor PDF para HTML-to-PDF com CJK
+
+### ✅ Alterações Realizadas
+
+#### Motor de Contratos (Refatoração Arquitetural)
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `backend/src/services/contractPdf.js` | MODIFICADO | Substituído o fluxo principal de geração de contrato para arquitetura HTML/CSS renderizada via `puppeteer` (HTML-to-PDF), com `UTF-8`, separação por idioma em páginas independentes (`page-break-after`), tabela financeira com `page-break-inside: avoid`, assinatura horizontal (Diretor, Comprador, 2 Testemunhas e Inkan) e sanitização estrita para evitar `null`, `undefined` e `(Não informado)`. |
+| `backend/package.json` | MODIFICADO | Adicionada dependência `puppeteer` para renderização robusta de PDF com suporte multilíngue. |
+
+#### Conformidade de Contrato
+
+- Mantida garantia de 3 meses para motor e câmbio.
+- Estrutura contratual em 8 cláusulas no layout jurídico.
+- Cabeçalho corporativo com `Hirata Cars Shop`, telefone e número de licença `古物商許可`.
+
+#### Requisitos Operacionais
+
+- Necessário instalar fontes CJK no servidor Linux para renderização japonesa correta (`fonts-noto-cjk`).
+- Recomendado provisionar dependências de runtime do Chromium para ambiente headless do Puppeteer.
+
+---
+
 ## [v2.6.1] — 2026-04-24 — Correção Crítica de Autenticação (401 Login)
 
 ### ✅ Alterações Realizadas
