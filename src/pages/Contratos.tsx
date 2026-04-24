@@ -108,6 +108,44 @@ const Contratos = () => {
     }
   };
 
+  const handleVisualizarContrato = async (vendaId: string) => {
+    try {
+      const response = await axios.get(`/api/vendas_carros/${vendaId}/contracts/view`, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+    } catch (e: unknown) {
+      if (axios.isAxiosError(e) && e.response?.status === 404) {
+        setErro('Arquivo de contrato não encontrado no servidor. Use "Regerar Contrato" para criar novamente.');
+      } else {
+        setErro('Erro ao visualizar contrato.');
+      }
+      console.error(e);
+    }
+  };
+
+  const handleDownloadContrato = async (vendaId: string, nomeCliente: string) => {
+    try {
+      const response = await axios.get(`/api/vendas_carros/${vendaId}/contracts/download`, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contrato_${nomeCliente.replace(/\s+/g, '_')}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      if (axios.isAxiosError(e) && e.response?.status === 404) {
+        setErro('Arquivo de contrato não encontrado no servidor. Use "Regerar Contrato" para criar novamente.');
+      } else {
+        setErro('Erro ao baixar contrato.');
+      }
+      console.error(e);
+    }
+  };
+
   const renderIdiomasSelecionados = (idiomas: IdiomaContrato[]) => {
     const lista = idiomas.length > 0 ? idiomas : IDIOMAS_PADRAO;
     return lista
@@ -258,13 +296,11 @@ const Contratos = () => {
                       {item.contratoGeradoEm
                         ? new Date(item.contratoGeradoEm).toLocaleString('ja-JP')
                         : '—'}
-                      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
                         <Button
                           size="small"
                           startIcon={<VisibilityIcon />}
-                          onClick={() =>
-                            window.open(`/api/vendas_carros/${item.id}/contracts/view`, '_blank')
-                          }
+                          onClick={() => handleVisualizarContrato(item.id)}
                         >
                           Ver
                         </Button>
@@ -272,11 +308,21 @@ const Contratos = () => {
                           size="small"
                           variant="outlined"
                           startIcon={<DownloadIcon />}
-                          onClick={() =>
-                            window.open(`/api/vendas_carros/${item.id}/contracts/download`, '_blank')
-                          }
+                          onClick={() => handleDownloadContrato(item.id, item.clienteNome)}
                         >
                           Download
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="warning"
+                          startIcon={processandoId === item.id ? undefined : <ArticleIcon />}
+                          onClick={() => handleGerarContrato(item.id)}
+                          disabled={processandoId === item.id}
+                        >
+                          {processandoId === item.id ? (
+                            <><CircularProgress size={14} sx={{ mr: 1 }} />Gerando…</>
+                          ) : 'Regerar'}
                         </Button>
                       </Stack>
                     </TableCell>
