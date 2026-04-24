@@ -4,6 +4,40 @@
 
 ---
 
+## [v2.6.0] — 2026-04-24 — Conformidade Estrita SRE (Restauração Final)
+
+### ✅ Alterações Realizadas (Escopo Controlado)
+
+#### deploy.sh (Servidor Linux)
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `deploy.sh` | MODIFICADO | Sequência consolidada para `/var/www/hiratacars.jp` com proteção de `.env` em `/tmp/.env.bak`, sincronização (`fetch/reset`), restauração com `chmod 600`, build (`npm install` backend + raiz + `npm run build`), criação de `backend/uploads/contracts`, `chmod -R 775 backend/uploads`, `chmod +x deploy.sh`, e restart persistente `pm2 restart hirata-backend && pm2 save`. |
+
+#### Segurança API (Zero Trust)
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `backend/server.js` | MODIFICADO | `requireAuth` endurecido para exigir sessão em toda rota `/api/` sem bypass de método (incluindo GET); sem sessão retorna `401`. |
+
+#### Módulo de Contratos (Validação)
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `src/pages/Contratos.tsx` | VALIDADO | Seleção múltipla mantida para `pt`, `ja`, `fil`, `vi`, `id`, `en`; tabela permanece sem IDs técnicos e com foco em Cliente, Veículo, Valor JPY e Data. |
+| `backend/src/routes/contracts.js` | VALIDADO | Geração de PDF único multilíngue mantida com nome `NomeDoCliente_Data.pdf`. |
+
+#### Faxina Técnica (Status Final)
+
+| Item | Status |
+|---|---|
+| `DashboardEntrega.tsx` | REMOVIDO |
+| `install-backend.sh` | REMOVIDO |
+| `DASHBOARD-ENTREGA.html` | REMOVIDO |
+| `backend2/` | REMOVIDO |
+
+---
+
 ## [v2.5.0] — 2026-04-24 — Restauração SRE: Deploy Escudo, Zero Trust e Contratos
 
 ### ✅ Alterações Realizadas (Escopo Restrito)

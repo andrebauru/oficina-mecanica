@@ -30,8 +30,10 @@ echo "📂 Ajustando permissões para os Contratos Multilíngues..."
 mkdir -p backend/uploads/contracts
 chmod -R 775 backend/uploads
 
+echo "⚙️  Garantindo permissão de execução do deploy..."
+chmod +x deploy.sh
+
 echo "🚀 Reiniciando PM2..."
-pm2 restart hirata-backend
-pm2 save
+pm2 restart hirata-backend && pm2 save
 
 echo "✅ Sistema Hirata Cars atualizado e protegido!"

@@ -540,7 +540,6 @@ app.use(sessionTimeout);
 // Middleware Zero Trust: toda rota /api exige sessão ativa
 function requireAuth(req, res, next) {
   if (!req.path.startsWith('/api/')) return next();
-  if (req.method === 'OPTIONS') return next();
   if (!req.session?.user) {
     return res.status(401).json({ message: 'Não autenticado. Faça login para continuar.' });
   }
