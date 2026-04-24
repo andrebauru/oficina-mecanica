@@ -215,8 +215,7 @@ export const VendasGestao: React.FC = () => {
     if (searchTerm) {
       filtrado = filtrado.filter(v =>
         v.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.clienteTelefone.includes(searchTerm) ||
-        v.vendaId.includes(searchTerm)
+        v.clienteTelefone.includes(searchTerm)
       );
     }
 
