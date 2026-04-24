@@ -537,9 +537,19 @@ app.use(session({
 }));
 app.use(sessionTimeout);
 
-// Middleware Zero Trust: toda rota /api exige sessão ativa
+// Middleware Zero Trust: toda rota /api exige sessão ativa,
+// exceto bootstrap de autenticação e saúde do serviço.
+const AUTH_PUBLIC_PATHS = [
+  '/api/auth/status',
+  '/api/auth/login',
+  '/api/auth/setup',
+  '/api/health',
+];
+
 function requireAuth(req, res, next) {
   if (!req.path.startsWith('/api/')) return next();
+  if (req.method === 'OPTIONS') return next();
+  if (AUTH_PUBLIC_PATHS.some((publicPath) => req.path === publicPath)) return next();
   if (!req.session?.user) {
     return res.status(401).json({ message: 'Não autenticado. Faça login para continuar.' });
   }

@@ -4,6 +4,28 @@
 
 ---
 
+## [v2.6.1] — 2026-04-24 — Correção Crítica de Autenticação (401 Login)
+
+### ✅ Alterações Realizadas
+
+#### Causa Raiz Identificada
+
+- O erro `401` em `/api/auth/status` e `/api/auth/login` era causado pelo `requireAuth` bloqueando também os próprios endpoints de bootstrap de autenticação.
+- Não foi encontrado problema de resolução do `.env` para este incidente específico.
+
+#### Correção Aplicada
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `backend/server.js` | MODIFICADO | Reintroduzida whitelist mínima de rotas públicas de autenticação: `/api/auth/status`, `/api/auth/login`, `/api/auth/setup` e `/api/health`; mantido bloqueio de todas as demais rotas `/api/*` com retorno `401` sem sessão ativa. |
+
+#### Validação
+
+- `npm run check` (backend): OK
+- `node --check server.js`: OK
+
+---
+
 ## [v2.6.0] — 2026-04-24 — Conformidade Estrita SRE (Restauração Final)
 
 ### ✅ Alterações Realizadas (Escopo Controlado)
