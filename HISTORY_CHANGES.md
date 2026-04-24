@@ -4,6 +4,42 @@
 
 ---
 
+## [v2.5.0] — 2026-04-24 — Restauração SRE: Deploy Escudo, Zero Trust e Contratos
+
+### ✅ Alterações Realizadas (Escopo Restrito)
+
+#### Infraestrutura e Deploy
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `deploy.sh` | MODIFICADO | Ajustado para ambiente real em `/var/www/hiratacars.jp` com sequência SRE estrita: backup de `backend/.env` em `/tmp/.env.bak` → `git fetch/reset` → restauração do `.env` com `chmod 600` → `npm install` backend/frontend + `npm run build` → criação de `backend/uploads/contracts` + `chmod -R 775 backend/uploads` → `pm2 restart hirata-backend` + `pm2 save`. |
+| `deploy.bat` | MANTIDO (VALIDADO) | Fluxo local preservado conforme política: validação com `npm run build` antes do envio, seguido de `git add -A`, `git commit` e `git push origin master --force`. |
+
+#### Segurança de API (Zero Trust)
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `backend/server.js` | MODIFICADO | `requireAuth` endurecido para proteger todas as rotas sob `/api/` sem bypass por método GET; ausência de sessão retorna `401`. |
+
+#### Módulo de Contratos
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `src/pages/Contratos.tsx` | MODIFICADO | Seleção múltipla mantida com os 6 idiomas (`pt`, `ja`, `fil`, `vi`, `id`, `en`); tabela simplificada para exibir apenas Cliente, Veículo, Valor (JPY) e Data; IDs técnicos permanecem ocultos. |
+| `backend/src/routes/contracts.js` | VALIDADO | Mantida geração de PDF único com múltiplos idiomas selecionados e convenção de nome `NomeDoCliente_Data.pdf`. |
+
+#### Faxina Técnica (Status)
+
+| Item | Status |
+|---|---|
+| `install-backend.sh` | REMOVIDO |
+| `src/pages/DashboardEntrega.tsx` | REMOVIDO |
+| `backend2/` | REMOVIDO |
+| `DASHBOARD-ENTREGA.html` | REMOVIDO |
+| rastros de banco JSON em runtime | REMOVIDOS |
+
+---
+
 ## [v2.4.0] — 2026-04-24 — Intervenção Arquitetural: Segurança, Contratos e Infraestrutura
 
 ### ✅ Alterações Realizadas

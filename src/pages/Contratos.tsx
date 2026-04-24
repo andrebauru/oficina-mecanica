@@ -31,6 +31,7 @@ interface VendaContrato {
   modelo: string;
   ano: number;
   valorTotal: number;
+  created_at?: string;
   contratoPath?: string;
   contratoGeradoEm?: string;
 }
@@ -62,7 +63,7 @@ const Contratos = () => {
   const [pendentes, setPendentes] = useState<VendaContrato[]>([]);
   const [gerados, setGerados] = useState<VendaContrato[]>([]);
   const [tab, setTab] = useState(0);
-  const [idiomasPorVenda, setIdiomasPorVenda] = useState<Record<string, IdiomaContrato[]>>({});
+  const [idiomasSelecionados, setIdiomasSelecionados] = useState<IdiomaContrato[]>(IDIOMAS_PADRAO);
   const [processandoId, setProcessandoId] = useState<string | null>(null);
 
   const carregar = async () => {
@@ -93,7 +94,7 @@ const Contratos = () => {
   }), [pendentes.length, gerados.length]);
 
   const handleGerarContrato = async (vendaId: string) => {
-    const idiomas = idiomasPorVenda[vendaId]?.length ? idiomasPorVenda[vendaId] : IDIOMAS_PADRAO;
+    const idiomas = idiomasSelecionados.length > 0 ? idiomasSelecionados : IDIOMAS_PADRAO;
     try {
       setProcessandoId(vendaId);
       setErro('');
@@ -107,9 +108,9 @@ const Contratos = () => {
     }
   };
 
-  const renderIdiomasSelecionados = (idiomasSelecionados: IdiomaContrato[]) => {
-    const idiomas = idiomasSelecionados.length > 0 ? idiomasSelecionados : IDIOMAS_PADRAO;
-    return idiomas
+  const renderIdiomasSelecionados = (idiomas: IdiomaContrato[]) => {
+    const lista = idiomas.length > 0 ? idiomas : IDIOMAS_PADRAO;
+    return lista
       .map((idioma) => IDIOMAS_DISPONIVEIS.find((option) => option.value === idioma)?.label || idioma)
       .join(', ');
   };
@@ -139,6 +140,28 @@ const Contratos = () => {
       )}
 
       <Paper sx={{ mb: 2 }}>
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+            Idiomas do contrato (PDF único)
+          </Typography>
+          <FormControl size="small" sx={{ minWidth: 360 }}>
+            <InputLabel>Idiomas</InputLabel>
+            <Select
+              multiple
+              label="Idiomas"
+              value={idiomasSelecionados}
+              renderValue={(selected) => renderIdiomasSelecionados(selected as IdiomaContrato[])}
+              onChange={(e) => setIdiomasSelecionados(e.target.value as IdiomaContrato[])}
+            >
+              {IDIOMAS_DISPONIVEIS.map((idioma) => (
+                <MenuItem key={idioma.value} value={idioma.value}>{idioma.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+            Padrão profissional: Português + Japonês no mesmo PDF.
+          </Typography>
+        </Box>
         <Tabs value={tab} onChange={(_e, v) => setTab(v)}>
           <Tab label={`Pendentes (${resumo.pendentes})`} />
           <Tab label={`Gerados (${resumo.gerados})`} />
@@ -157,14 +180,13 @@ const Contratos = () => {
                 <TableCell><strong>Cliente</strong></TableCell>
                 <TableCell><strong>Veículo</strong></TableCell>
                 <TableCell align="right"><strong>Valor (JPY)</strong></TableCell>
-                <TableCell sx={{ minWidth: 240 }}><strong>Idiomas do Contrato</strong></TableCell>
-                <TableCell align="right"><strong>Ações</strong></TableCell>
+                <TableCell><strong>Data</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {pendentes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                  <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                     Nenhuma venda pendente de contrato.
                   </TableCell>
                 </TableRow>
@@ -181,30 +203,9 @@ const Contratos = () => {
                     <strong>{formatJPY(item.valorTotal)}</strong>
                   </TableCell>
                   <TableCell>
-                    <FormControl size="small" fullWidth>
-                      <InputLabel>Idiomas</InputLabel>
-                      <Select
-                        multiple
-                        label="Idiomas"
-                        value={idiomasPorVenda[item.id] || IDIOMAS_PADRAO}
-                        renderValue={(selected) => renderIdiomasSelecionados(selected as IdiomaContrato[])}
-                        onChange={(e) =>
-                          setIdiomasPorVenda(prev => ({
-                            ...prev,
-                            [item.id]: e.target.value as IdiomaContrato[],
-                          }))
-                        }
-                      >
-                        {IDIOMAS_DISPONIVEIS.map((idioma) => (
-                          <MenuItem key={idioma.value} value={idioma.value}>{idioma.label}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
-                      Padrão profissional: Português + Japonês no mesmo PDF.
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {item.created_at ? new Date(item.created_at).toLocaleString('ja-JP') : '—'}
                     </Typography>
-                  </TableCell>
-                  <TableCell align="right">
                     <Button
                       variant="contained"
                       size="small"
@@ -231,13 +232,12 @@ const Contratos = () => {
                 <TableCell><strong>Veículo</strong></TableCell>
                 <TableCell align="right"><strong>Valor (JPY)</strong></TableCell>
                 <TableCell><strong>Gerado em</strong></TableCell>
-                <TableCell align="right"><strong>Ações</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {gerados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                  <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                     Nenhum contrato gerado ainda.
                   </TableCell>
                 </TableRow>
@@ -258,9 +258,7 @@ const Contratos = () => {
                       {item.contratoGeradoEm
                         ? new Date(item.contratoGeradoEm).toLocaleString('ja-JP')
                         : '—'}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                         <Button
                           size="small"
                           startIcon={<VisibilityIcon />}
