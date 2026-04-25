@@ -70,12 +70,21 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const resolveDocPath = (doc: Documento) => doc.caminho || doc.filePath || doc.base64 || '';
-  const resolveFullUrl = (doc: Documento) => {
-    const p = resolveDocPath(doc);
-    if (!p) return '';
-    if (/^https?:\/\//i.test(p) || p.startsWith('data:')) return p;
-    return `${window.location.origin}${p.startsWith('/') ? p : `/${p}`}`;
+  const backendBaseUrl = import.meta.env.DEV
+    ? 'http://localhost:3001'
+    : window.location.origin;
+
+  const resolveFileUrl = (doc: Documento) => {
+    const fileUrl = doc.caminho || doc.base64 || doc.filePath || '';
+    if (!fileUrl) return '';
+    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+    return `${backendBaseUrl}${fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`}`;
+  };
+
+  const isPdfFile = (url: string, filename?: string) => {
+    const byUrl = /\.pdf($|\?)/i.test(url);
+    const byName = /\.pdf$/i.test(filename || '');
+    return byUrl || byName;
   };
 
   const fetchDocs = useCallback(async () => {
@@ -214,15 +223,48 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                 <Grid item xs={12} sm={6} md={4} key={doc.id}>
                   <Card elevation={2} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {(() => {
-                      const fullUrl = resolveFullUrl(doc);
+                      const fileUrl = resolveFileUrl(doc);
+                      const isPdf = isPdfFile(fileUrl, doc.filename);
+
+                      if (!fileUrl) {
+                        return (
+                          <Box
+                            sx={{
+                              height: 170,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              bgcolor: '#f5f5f5',
+                              color: 'text.secondary',
+                              px: 2,
+                              textAlign: 'center',
+                            }}
+                          >
+                            <Typography variant="body2">Arquivo indisponível</Typography>
+                          </Box>
+                        );
+                      }
+
+                      if (isPdf) {
+                        return (
+                          <Box sx={{ height: 170, bgcolor: '#f5f5f5' }}>
+                            <iframe
+                              src={fileUrl}
+                              title={doc.filename}
+                              style={{ width: '100%', height: '100%', border: 'none' }}
+                            />
+                          </Box>
+                        );
+                      }
+
                       return (
-                    <CardMedia
-                      component="img"
-                      image={fullUrl || ''}
-                      alt={doc.filename}
-                      sx={{ height: 170, objectFit: 'cover', cursor: 'zoom-in' }}
-                      onClick={() => fullUrl && setLightbox(fullUrl)}
-                    />
+                        <CardMedia
+                          component="img"
+                          image={fileUrl}
+                          alt={doc.filename}
+                          sx={{ height: 170, objectFit: 'cover', cursor: 'zoom-in' }}
+                          onClick={() => setLightbox(fileUrl)}
+                        />
                       );
                     })()}
                     <CardContent sx={{ flexGrow: 1, pb: 0 }}>
@@ -260,10 +302,11 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                         <Tooltip title="Visualizar">
                           <IconButton
                             size="small"
+                            disabled={!resolveFileUrl(doc)}
                             onClick={() => {
-                              const fullUrl = resolveFullUrl(doc);
-                              if (fullUrl) {
-                                window.open(fullUrl, '_blank');
+                              const fileUrl = resolveFileUrl(doc);
+                              if (fileUrl) {
+                                window.open(fileUrl, '_blank');
                               }
                             }}
                           >
@@ -273,10 +316,11 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                         <Tooltip title={t('ampliar')}>
                           <IconButton
                             size="small"
+                            disabled={!resolveFileUrl(doc) || isPdfFile(resolveFileUrl(doc), doc.filename)}
                             onClick={() => {
-                              const fullUrl = resolveFullUrl(doc);
-                              if (fullUrl) {
-                                setLightbox(fullUrl);
+                              const fileUrl = resolveFileUrl(doc);
+                              if (fileUrl && !isPdfFile(fileUrl, doc.filename)) {
+                                setLightbox(fileUrl);
                               }
                             }}
                           >
