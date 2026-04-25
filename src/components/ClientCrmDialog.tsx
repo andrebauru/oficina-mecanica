@@ -27,13 +27,15 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import ImageIcon from '@mui/icons-material/Image';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 interface ClientDocument {
   id: string;
-  document_type: string;
-  path: string;
-  original_filename: string;
-  created_at: string;
+  categoria?: string;
+  caminho?: string;
+  base64?: string;
+  filename?: string;
+  dataUpload?: string;
 }
 
 interface ClientInteraction {
@@ -73,6 +75,9 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const backendBaseUrl = import.meta.env.VITE_API_BASE_URL
+    || (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
+
   useEffect(() => {
     if (open) {
       fetchDocuments();
@@ -83,7 +88,7 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/clients/${clientId}/documents`);
+      const response = await axios.get(`/api/documentos/cliente/${clientId}`);
       setDocuments(response.data);
     } catch (error) {
       console.error('Erro ao buscar documentos:', error);
@@ -124,15 +129,21 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
         throw new Error('Arquivo muito grande. Máximo 10MB.');
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('documentType', documentType);
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+        reader.readAsDataURL(file);
+      });
 
-      const response = await axios.post(
-        `/api/clients/${clientId}/documents`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
+      const response = await axios.post('/api/documentos', {
+        entityId: clientId,
+        entityType: 'cliente',
+        base64: base64Data,
+        filename: file.name,
+        categoria: documentType,
+        dataUpload: new Date().toISOString(),
+      });
 
       setDocuments([response.data, ...documents]);
       setSuccess('Documento enviado com sucesso');
@@ -151,7 +162,7 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
     if (!window.confirm('Tem certeza que deseja deletar este documento?')) return;
 
     try {
-      await axios.delete(`/api/clients/${clientId}/documents/${documentId}`);
+      await axios.delete(`/api/documentos/${documentId}`);
       setDocuments(documents.filter(d => d.id !== documentId));
       setSuccess('Documento deletado com sucesso');
       setTimeout(() => setSuccess(''), 3000);
@@ -200,6 +211,16 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
     }
     return <DescriptionIcon sx={{ mr: 1 }} />;
   };
+
+  const resolveFileUrl = (doc: ClientDocument) => {
+    const raw = doc.caminho || doc.base64 || '';
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith('/uploads')) return `${backendBaseUrl}${raw}`;
+    return `${backendBaseUrl}${raw.startsWith('/') ? raw : `/${raw}`}`;
+  };
+
+  const handleView = (fileUrl: string) => window.open(fileUrl, '_blank');
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -251,14 +272,32 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
                 {documents.map((doc, index) => (
                   <Box key={doc.id}>
                     <ListItem>
+                      {(() => {
+                        const fileUrl = resolveFileUrl(doc);
+                        const displayName = doc.filename || 'arquivo';
+                        const createdAt = doc.dataUpload || '';
+                        return (
                       <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                        {getFileIcon(doc.original_filename)}
+                        {getFileIcon(displayName)}
                         <ListItemText
-                          primary={doc.document_type}
-                          secondary={`${doc.original_filename} - ${new Date(doc.created_at).toLocaleDateString('pt-BR')}`}
+                          primary={doc.categoria || 'Documento'}
+                          secondary={`${displayName}${createdAt ? ` - ${new Date(createdAt).toLocaleDateString('pt-BR')}` : ''}`}
                         />
                       </Box>
+                        );
+                      })()}
                       <ListItemSecondaryAction>
+                        <IconButton
+                          edge="end"
+                          sx={{ mr: 0.5 }}
+                          disabled={!resolveFileUrl(doc)}
+                          onClick={() => {
+                            const fileUrl = resolveFileUrl(doc);
+                            if (fileUrl) handleView(fileUrl);
+                          }}
+                        >
+                          <VisibilityIcon />
+                        </IconButton>
                         <IconButton
                           edge="end"
                           color="error"
