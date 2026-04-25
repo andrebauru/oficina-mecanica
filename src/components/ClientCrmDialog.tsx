@@ -269,14 +269,14 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
           ) : documents.length > 0 ? (
             <Paper sx={{ p: 2 }}>
               <List sx={{ width: '100%' }}>
-                {documents.map((doc, index) => (
+                {documents.map((doc, index) => {
+                  const fileUrl = resolveFileUrl(doc);
+                  const displayName = doc.filename || 'arquivo';
+                  const createdAt = doc.dataUpload || '';
+
+                  return (
                   <Box key={doc.id}>
                     <ListItem>
-                      {(() => {
-                        const fileUrl = resolveFileUrl(doc);
-                        const displayName = doc.filename || 'arquivo';
-                        const createdAt = doc.dataUpload || '';
-                        return (
                       <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                         {getFileIcon(displayName)}
                         <ListItemText
@@ -284,15 +284,12 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
                           secondary={`${displayName}${createdAt ? ` - ${new Date(createdAt).toLocaleDateString('pt-BR')}` : ''}`}
                         />
                       </Box>
-                        );
-                      })()}
                       <ListItemSecondaryAction>
                         <IconButton
                           edge="end"
                           sx={{ mr: 0.5 }}
-                          disabled={!resolveFileUrl(doc)}
+                          disabled={!fileUrl}
                           onClick={() => {
-                            const fileUrl = resolveFileUrl(doc);
                             if (fileUrl) handleView(fileUrl);
                           }}
                         >
@@ -309,7 +306,8 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
                     </ListItem>
                     {index < documents.length - 1 && <Divider />}
                   </Box>
-                ))}
+                  );
+                })}
               </List>
             </Paper>
           ) : (

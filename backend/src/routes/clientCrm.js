@@ -20,8 +20,11 @@ router.get('/clients/:clientId/interactions', async (req, res) => {
          id,
          client_id,
          interaction_text,
+         interaction_text AS descricao,
          observation,
          interaction_type,
+         interaction_type AS tipo,
+         created_at AS data_interacao,
          created_at
        FROM client_interactions
        WHERE client_id = ?
