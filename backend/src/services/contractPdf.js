@@ -467,7 +467,7 @@ function contractTemplateByLanguage(language = 'pt') {
         parcelas: 'Parcelas',
         localDate: 'Cidade/Data',
       },
-      signatures: ['Diretor', 'Comprador', 'Testemunha 1', 'Testemunha 2', 'Carimbo (印鑑)'],
+      signatures: ['Diretor', 'Comprador', 'Houshonin', 'Carimbo (印鑑)'],
     },
     ja: {
       locale: 'ja-JP',
@@ -484,7 +484,7 @@ function contractTemplateByLanguage(language = 'pt') {
         parcelas: '分割',
         localDate: '作成地/日付',
       },
-      signatures: ['代表者', '買主', '証人1', '証人2', '印鑑'],
+      signatures: ['代表者', '買主', 'Houshonin', '印鑑'],
     },
     fil: {
       locale: 'fil-PH',
@@ -501,7 +501,7 @@ function contractTemplateByLanguage(language = 'pt') {
         parcelas: 'Mga Hulog',
         localDate: 'Lungsod/Petsa',
       },
-      signatures: ['Direktor', 'Mamimili', 'Saksi 1', 'Saksi 2', 'Selyo (印鑑)'],
+      signatures: ['Direktor', 'Mamimili', 'Houshonin', 'Selyo (印鑑)'],
     },
     vi: {
       locale: 'vi-VN',
@@ -518,7 +518,7 @@ function contractTemplateByLanguage(language = 'pt') {
         parcelas: 'Trả góp',
         localDate: 'Địa điểm/Ngày',
       },
-      signatures: ['Giám đốc', 'Bên mua', 'Nhân chứng 1', 'Nhân chứng 2', 'Con dấu (印鑑)'],
+      signatures: ['Giám đốc', 'Bên mua', 'Houshonin', 'Con dấu (印鑑)'],
     },
     id: {
       locale: 'id-ID',
@@ -535,7 +535,7 @@ function contractTemplateByLanguage(language = 'pt') {
         parcelas: 'Cicilan',
         localDate: 'Kota/Tanggal',
       },
-      signatures: ['Direktur', 'Pembeli', 'Saksi 1', 'Saksi 2', 'Stempel (印鑑)'],
+      signatures: ['Direktur', 'Pembeli', 'Houshonin', 'Stempel (印鑑)'],
     },
     en: {
       locale: 'en-US',
@@ -552,7 +552,7 @@ function contractTemplateByLanguage(language = 'pt') {
         parcelas: 'Installments',
         localDate: 'City/Date',
       },
-      signatures: ['Director', 'Buyer', 'Witness 1', 'Witness 2', 'Seal (印鑑)'],
+      signatures: ['Director', 'Buyer', 'Houshonin', 'Seal (印鑑)'],
     },
   };
 
@@ -631,27 +631,27 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
       <h2 class="contract-title">${escapeHtml(template.title)}</h2>
 
       <section class="parties">
-        <p><strong>${escapeHtml(template.sellerLabel)}:</strong> ${escapeHtml(empresaNome)}</p>
-        <p>${escapeHtml(empresaNacionalidade)} | ${escapeHtml(empresaProfissao)} | ${escapeHtml(empresaEstadoCivil)}</p>
-        <p>Zairyo Card: ${escapeHtml(empresaLicenca)} | Endereço: ${escapeHtml(empresaEndereco)}</p>
-        <p><strong>${escapeHtml(template.buyerLabel)}:</strong> ${escapeHtml(compradorNome)}</p>
-        <p>${escapeHtml(compradorNacionalidade)} | ${escapeHtml(compradorProfissao)} | ${escapeHtml(compradorEstadoCivil)}</p>
-        <p>Zairyo Card: ${escapeHtml(compradorDoc)} | Endereço: ${escapeHtml(compradorEndereco)}</p>
+        <p><strong>${escapeHtml(template.sellerLabel)}:</strong> <strong>${escapeHtml(empresaNome)}</strong></p>
+        <p><strong>${escapeHtml(empresaNacionalidade)}</strong> | <strong>${escapeHtml(empresaProfissao)}</strong> | <strong>${escapeHtml(empresaEstadoCivil)}</strong></p>
+        <p>Menkyo: <strong>${escapeHtml(empresaLicenca)}</strong> | Endereço: <strong>${escapeHtml(empresaEndereco)}</strong></p>
+        <p><strong>${escapeHtml(template.buyerLabel)}:</strong> <strong>${escapeHtml(compradorNome)}</strong></p>
+        <p><strong>${escapeHtml(compradorNacionalidade)}</strong> | <strong>${escapeHtml(compradorProfissao)}</strong> | <strong>${escapeHtml(compradorEstadoCivil)}</strong></p>
+        <p>Menkyo: <strong>${escapeHtml(compradorDoc)}</strong> | Endereço: <strong>${escapeHtml(compradorEndereco)}</strong></p>
       </section>
 
       <p class="intro">${escapeHtml(template.intro)}</p>
 
       <section class="vehicle-box">
-        <p><strong>Veículo:</strong> ${escapeHtml(payload.veiculo.fabricante)} | ${escapeHtml(payload.veiculo.modelo)} | ${escapeHtml(payload.veiculo.ano)}</p>
-        <p><strong>Chassi:</strong> ${escapeHtml(payload.veiculo.chassi)} &nbsp;&nbsp; <strong>Placa:</strong> ${escapeHtml(payload.veiculo.placa)} &nbsp;&nbsp; <strong>KM:</strong> ${escapeHtml(payload.veiculo.km)}</p>
+        <p><strong>Veículo:</strong> <strong>${escapeHtml(payload.veiculo.fabricante)}</strong> | <strong>${escapeHtml(payload.veiculo.modelo)}</strong> | <strong>${escapeHtml(payload.veiculo.ano)}</strong></p>
+        <p><strong>Chassi:</strong> <strong>${escapeHtml(payload.veiculo.chassi)}</strong> &nbsp;&nbsp; <strong>Placa:</strong> <strong>${escapeHtml(payload.veiculo.placa)}</strong> &nbsp;&nbsp; <strong>KM:</strong> <strong>${escapeHtml(payload.veiculo.km)}</strong></p>
       </section>
 
       ${clausesHtml}
 
       <section class="payment-summary">
-        <p><strong>${escapeHtml(template.labels.total)}:</strong> ${escapeHtml(formatCurrency(payload.pagamento.total))}</p>
-        <p><strong>${escapeHtml(template.labels.sinal)}:</strong> ${escapeHtml(formatCurrency(payload.pagamento.sinal))}</p>
-        <p><strong>${escapeHtml(template.labels.parcelas)}:</strong> ${escapeHtml(payload.pagamento.totalParcelas)} x ${escapeHtml(formatCurrency(payload.pagamento.valorParcela))}</p>
+        <p><strong>${escapeHtml(template.labels.total)}:</strong> <strong>${escapeHtml(formatCurrency(payload.pagamento.total))}</strong></p>
+        <p><strong>${escapeHtml(template.labels.sinal)}:</strong> <strong>${escapeHtml(formatCurrency(payload.pagamento.sinal))}</strong></p>
+        <p><strong>${escapeHtml(template.labels.parcelas)}:</strong> <strong>${escapeHtml(payload.pagamento.totalParcelas)} x ${escapeHtml(formatCurrency(payload.pagamento.valorParcela))}</strong></p>
       </section>
 
       <table class="installments-table" aria-label="Tabela financeira de parcelas">
@@ -677,18 +677,27 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
 }
 
 function resolveLogoPath() {
-  const candidates = [
-    path.resolve(__dirname, '../../../public/Hirata Logo.png'),
-    path.resolve(__dirname, '../../assets/Hirata Logo.png'),
-  ];
+  try {
+    const distAssetsDir = path.resolve(__dirname, '../../../dist/assets');
+    if (fs.existsSync(distAssetsDir)) {
+      const files = fs.readdirSync(distAssetsDir);
+      const logoFile = files.find((file) => {
+        const lower = String(file).toLowerCase();
+        return file.startsWith('Hirata Logo') && (lower.endsWith('.svg') || lower.endsWith('.png'));
+      });
 
-  return candidates.find((candidate) => {
-    try {
-      return fs.existsSync(candidate);
-    } catch {
-      return false;
+      if (logoFile) {
+        return path.join(distAssetsDir, logoFile);
+      }
     }
-  }) || null;
+  } catch {
+    // continua para fallback
+  }
+
+  const fallbackPublicSvg = path.resolve(__dirname, '../../../public/Hirata Logo.svg');
+  if (fs.existsSync(fallbackPublicSvg)) return fallbackPublicSvg;
+
+  return null;
 }
 
 function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
@@ -710,6 +719,7 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
         <meta charset="UTF-8" />
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet">
         <title>Contrato de Compra e Venda</title>
         <style>
           @page {
@@ -717,7 +727,10 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
             margin: 18mm 14mm 18mm 14mm;
           }
 
-          * { box-sizing: border-box; }
+          * {
+            box-sizing: border-box;
+            font-family: 'Noto Sans JP', sans-serif !important;
+          }
 
           html, body {
             margin: 0;
@@ -842,7 +855,7 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
           .signature-grid {
             display: flex;
             gap: 10px;
-            margin-top: 10px;
+            margin-top: 80px;
             flex-wrap: nowrap;
             align-items: flex-end;
           }
@@ -855,8 +868,7 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
 
           .signature-line {
             border-top: 1px solid #111;
-            margin-bottom: 4px;
-            height: 18px;
+            margin-bottom: 8px;
           }
 
           .signature-label {
@@ -907,6 +919,7 @@ async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, client
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.evaluateHandle('document.fonts.ready');
 
     const pdfBuffer = await page.pdf({
       format: 'A4',

@@ -11,6 +11,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import { useLanguage } from './LanguageContext';
 
@@ -18,10 +19,12 @@ interface Documento {
   id: string;
   entityId: string;
   entityType: string;
-  base64: string;
   filename: string;
   anotacao: string;
   dataUpload: string;
+  caminho?: string;
+  filePath?: string;
+  base64?: string;
 }
 
 interface Props {
@@ -67,13 +70,19 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const resolveDocPath = (doc: Documento) => doc.caminho || doc.filePath || doc.base64 || '';
+  const resolveFullUrl = (doc: Documento) => {
+    const p = resolveDocPath(doc);
+    if (!p) return '';
+    if (/^https?:\/\//i.test(p) || p.startsWith('data:')) return p;
+    return `${window.location.origin}${p.startsWith('/') ? p : `/${p}`}`;
+  };
+
   const fetchDocs = useCallback(async () => {
     if (!entityId) return;
     setLoading(true);
     try {
-      const res = await axios.get(
-        `/api/documentos?entityId=${entityId}&entityType=${entityType}`
-      );
+      const res = await axios.get(`/api/documentos/${entityType}/${entityId}`);
       const docs: Documento[] = res.data;
       setDocumentos(docs);
       const map: Record<string, string> = {};
@@ -204,13 +213,18 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
               {documentos.map(doc => (
                 <Grid item xs={12} sm={6} md={4} key={doc.id}>
                   <Card elevation={2} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {(() => {
+                      const fullUrl = resolveFullUrl(doc);
+                      return (
                     <CardMedia
                       component="img"
-                      image={doc.base64}
+                      image={fullUrl || ''}
                       alt={doc.filename}
                       sx={{ height: 170, objectFit: 'cover', cursor: 'zoom-in' }}
-                      onClick={() => setLightbox(doc.base64)}
+                      onClick={() => fullUrl && setLightbox(fullUrl)}
                     />
+                      );
+                    })()}
                     <CardContent sx={{ flexGrow: 1, pb: 0 }}>
                       <Typography variant="caption" color="text.secondary" display="block" noWrap sx={{ mb: 0.5 }}>
                         {doc.filename}
@@ -243,8 +257,29 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                         </span>
                       </Tooltip>
                       <Box>
+                        <Tooltip title="Visualizar">
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              const fullUrl = resolveFullUrl(doc);
+                              if (fullUrl) {
+                                window.open(fullUrl, '_blank');
+                              }
+                            }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title={t('ampliar')}>
-                          <IconButton size="small" onClick={() => setLightbox(doc.base64)}>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              const fullUrl = resolveFullUrl(doc);
+                              if (fullUrl) {
+                                setLightbox(fullUrl);
+                              }
+                            }}
+                          >
                             <ZoomInIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>

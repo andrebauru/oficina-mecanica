@@ -306,7 +306,7 @@ const ENTITY_ROUTES = {
       entityId: 'entity_id',
       entityType: 'entity_type',
       filename: 'filename',
-      filePath: 'file_path',
+      filePath: 'caminho',
       anotacao: 'anotacao',
       categoria: 'categoria',
       referenciaId: 'referencia_id',
@@ -758,7 +758,6 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
       categoria,
       referenciaId,
       referenciaTipo,
-      arquivoOriginal,
       dataUpload,
     } = req.body || {};
 
@@ -781,39 +780,33 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
     // Salvar arquivo físico
     fs.writeFileSync(fileDest, Buffer.from(base64Data, 'base64'));
 
-    // Montar INSERT usando somente as colunas que o schema garante existirem
-    const newId = generateId('doc');
+    // Montar INSERT com colunas camelCase (schema legado em produção)
     const dataUploadFinal = dataUpload
       ? new Date(dataUpload).toISOString().slice(0, 19).replace('T', ' ')
       : new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    // Colunas obrigatórias + opcionais sempre presentes no schema
-    const cols = ['id', 'entity_id', 'entity_type', 'base64', 'filename', 'data_upload'];
-    const vals = [newId, entityId, entityType, filePathRelativo, filename, dataUploadFinal];
-
-    // Colunas opcionais (nullable) — adicionar só se tiver valor
-    if (anotacao)     { cols.push('anotacao');      vals.push(anotacao); }
-    if (categoria)    { cols.push('categoria');     vals.push(categoria); }
-    if (referenciaId) { cols.push('referencia_id'); vals.push(referenciaId); }
-    if (referenciaTipo) { cols.push('referencia_tipo'); vals.push(referenciaTipo); }
-
-    // arquivo_original — adicionar somente se a coluna existir
-    try {
-      await query('SELECT arquivo_original FROM documentos LIMIT 0');
-      cols.push('arquivo_original');
-      vals.push(arquivoOriginal || filename);
-    } catch { /* coluna não existe, ignorar */ }
-
-    await query(
-      `INSERT INTO documentos (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
-      vals
+    const result = await query(
+      `INSERT INTO documentos (entityId, entityType, filename, caminho, anotacao, categoria, dataUpload, referenciaId, referenciaTipo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        entityId,
+        entityType,
+        filename,
+        filePathRelativo,
+        anotacao || null,
+        categoria || null,
+        dataUploadFinal,
+        referenciaId || null,
+        referenciaTipo || null,
+      ]
     );
 
     return res.status(201).json({
-      id: newId,
+      id: result?.insertId,
       entityId,
       entityType,
       filename,
+      caminho: filePathRelativo,
       filePath: filePathRelativo,
       anotacao: anotacao || null,
       categoria: categoria || null,
@@ -828,7 +821,7 @@ app.get('/api/documentos/:entityType/:entityId', safeRoute(async (req, res) => {
   try {
     const { entityType, entityId } = req.params;
     const rows = await query(
-      'SELECT * FROM documentos WHERE entity_type = ? AND entity_id = ? ORDER BY data_upload DESC',
+      'SELECT * FROM documentos WHERE entityType = ? AND entityId = ? ORDER BY dataUpload DESC',
       [entityType, entityId]
     );
     return res.json(rows);
