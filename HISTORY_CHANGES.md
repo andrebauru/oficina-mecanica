@@ -4,6 +4,40 @@
 
 ---
 
+## [v2.8.0] — 2026-04-25 — Armazenamento Local, Backup Automático e Confiabilidade Contratual
+
+### ✅ Alterações Realizadas
+
+#### API de Documentos e Armazenamento Físico
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `backend/server.js` | MODIFICADO | `POST /api/documentos` refatorado para salvar arquivos fisicamente em `/var/www/hiratacars.jp/backend/uploads/documentos` com nome único `timestamp_filename`; tabela `documentos` passa a armazenar apenas metadados e nome/caminho relativo (sem payload base64 completo no banco). |
+| `backend/server.js` | MODIFICADO | `GET /api/documentos/:entityType/:entityId` normalizado com aliases de colunas para compatibilidade do frontend (`entityId`, `entityType`, `dataUpload`, `caminho`, `filePath`). |
+| `backend/server.js` | MODIFICADO | Limite de carga aumentado para `app.use(express.json({ limit: '100mb' }))` e `express.urlencoded` no mesmo limite. |
+
+#### Backup Operacional
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `sistema-backup.sh` | NOVO | Script SRE para backup automático: cria pasta temporária datada, executa `mysqldump` do banco `hirata_cars`, compacta `backend/uploads/`, inclui `.env` quando presente, gera pacote `.tar.gz` final e remove backups com mais de 30 dias. |
+
+#### Deploy e Segurança de Arquivos
+
+| Arquivo | Tipo | Descrição |
+|---|---|---|
+| `deploy.sh` | MODIFICADO | Garantia explícita de criação e permissões `775` em `backend/uploads/documentos` e `backend/uploads/contracts`. |
+| `.gitignore` | MODIFICADO | Reforço de proteção para variáveis de ambiente e diretórios de upload runtime (`backend/uploads/documentos/`). |
+
+#### Contrato Jurídico Multilíngue
+
+- Mantida estrutura jurídica em 8 cláusulas por idioma (PT/JA/FIL/VI/ID/EN) em PDF único.
+- Terminologia consolidada com **Menkyo** e assinatura **Houshonin**.
+- Assinaturas mantidas em 4 campos: Diretor, Comprador, Houshonin e Carimbo (印鑑).
+- Dados dinâmicos seguem em destaque (`<strong>`) quando preenchidos.
+
+---
+
 ## [v2.7.0] — 2026-04-24 — Troca de Motor PDF para HTML-to-PDF com CJK
 
 ### ✅ Alterações Realizadas

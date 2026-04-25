@@ -10,6 +10,8 @@ const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout
 const clientCrmRouter = require('./src/routes/clientCrm');
 const contractsRouter = require('./src/routes/contracts');
 
+const DOCUMENTOS_STORAGE_DIR = '/var/www/hiratacars.jp/backend/uploads/documentos';
+
 // ─── Utilitários de senha (espelho de src/utils/security.ts) ──────────────────
 function legacyHashPassword(str) {
   let h1 = 0xdeadbeef;
@@ -583,10 +585,10 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie'],
   optionsSuccessStatus: 200,
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 // Servir arquivos estáticos de uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static('/var/www/hiratacars.jp/backend/uploads'));
 app.use(session({
   secret: env.sessionSecret,
   resave: false,
@@ -769,7 +771,7 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
     const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
 
     // Garantir que a pasta de uploads exista
-    const uploadDir = path.join(__dirname, 'uploads', 'documentos');
+    const uploadDir = DOCUMENTOS_STORAGE_DIR;
     fs.mkdirSync(uploadDir, { recursive: true });
 
     // Nome único para o arquivo
@@ -785,24 +787,28 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
       ? new Date(dataUpload).toISOString().slice(0, 19).replace('T', ' ')
       : new Date().toISOString().slice(0, 19).replace('T', ' ');
 
+    const docId = `doc_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
     const result = await query(
-      `INSERT INTO documentos (entityId, entityType, filename, caminho, anotacao, categoria, dataUpload, referenciaId, referenciaTipo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO documentos (id, entity_id, entity_type, base64, filename, anotacao, categoria, referencia_id, referencia_tipo, arquivo_original, data_upload)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        docId,
         entityId,
         entityType,
+        safeName,
         filename,
-        filePathRelativo,
         anotacao || null,
         categoria || null,
-        dataUploadFinal,
         referenciaId || null,
         referenciaTipo || null,
+        filePathRelativo,
+        dataUploadFinal,
       ]
     );
 
     return res.status(201).json({
-      id: result?.insertId,
+      id: result?.insertId || docId,
       entityId,
       entityType,
       filename,
@@ -821,7 +827,20 @@ app.get('/api/documentos/:entityType/:entityId', safeRoute(async (req, res) => {
   try {
     const { entityType, entityId } = req.params;
     const rows = await query(
-      'SELECT * FROM documentos WHERE entityType = ? AND entityId = ? ORDER BY dataUpload DESC',
+      `SELECT
+         id,
+         entity_id AS entityId,
+         entity_type AS entityType,
+         filename,
+         anotacao,
+         categoria,
+         data_upload AS dataUpload,
+         arquivo_original AS caminho,
+         arquivo_original AS filePath,
+         arquivo_original AS base64
+       FROM documentos
+       WHERE entity_type = ? AND entity_id = ?
+       ORDER BY data_upload DESC`,
       [entityType, entityId]
     );
     return res.json(rows);

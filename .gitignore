@@ -8,6 +8,7 @@ dist-build.tar.gz
 
 # === Variáveis de ambiente ===
 .env
+.env*
 .env.local
 .env.*.local
 .env.production
@@ -21,6 +22,7 @@ npm-debug.log*
 # === Uploads (gerados em runtime) ===
 backend/storage/
 backend/uploads/
+backend/uploads/documentos/
 backend/uploads/contracts/
 backend/uploads/customer_images/
 public/uploads/
