@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
   Box,
@@ -51,6 +51,8 @@ interface ClienteFormData {
   endereco: string;
   cnh_number: string;
   observacoes_gerais: string;
+  documento1?: File;
+  documento2?: File;
 }
 
 const clienteVazio: ClienteFormData = {
@@ -93,6 +95,10 @@ const Clientes = () => {
     direcao: 'asc'
   });
 
+  // Refs para inputs de arquivo
+  const documento1Ref = useRef<HTMLInputElement>(null);
+  const documento2Ref = useRef<HTMLInputElement>(null);
+
   const fetchClientes = async () => {
     try {
       setLoading(true);
@@ -130,6 +136,9 @@ const Clientes = () => {
       setFormData(clienteVazio);
       setEditingId(null);
     }
+    // Limpar inputs de arquivo
+    if (documento1Ref.current) documento1Ref.current.value = '';
+    if (documento2Ref.current) documento2Ref.current.value = '';
     setOpenForm(true);
   };
 
@@ -145,23 +154,91 @@ const Clientes = () => {
     }));
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'documento1' | 'documento2') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({
+        ...prev,
+        [fieldName]: file
+      }));
+    }
+  };
+
   const handleSubmit = async () => {
     try {
+      // Preparar dados do cliente (sem os arquivos)
+      const clienteData: ClienteFormData = {
+        nome: formData.nome,
+        email: formData.email,
+        telefone: formData.telefone,
+        endereco: formData.endereco,
+        cnh_number: formData.cnh_number,
+        observacoes_gerais: formData.observacoes_gerais
+      };
+
+      let clienteId = editingId;
+
       if (editingId) {
-        await axios.put(`/api/clientes/${editingId}`, formData);
+        await axios.put(`/api/clientes/${editingId}`, clienteData);
         setSnackbar({
           open: true,
           message: 'Cliente atualizado com sucesso',
           severity: 'success'
         });
       } else {
-        await axios.post('/api/clientes', formData);
+        const response = await axios.post('/api/clientes', clienteData);
+        clienteId = response.data?.id;
         setSnackbar({
           open: true,
           message: 'Cliente adicionado com sucesso',
           severity: 'success'
         });
       }
+
+      // Upload de documentos se fornecidos
+      if (clienteId && (formData.documento1 || formData.documento2)) {
+        try {
+          const uploadDocumento = async (file: File, categoria: string, anotacao: string) => {
+            return new Promise<void>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = async (event) => {
+                try {
+                  const base64 = (event.target?.result as string)?.split(',')[1];
+                  if (base64) {
+                    await axios.post('/api/documentos', {
+                      entityId: clienteId,
+                      entityType: 'cliente',
+                      base64,
+                      filename: file.name,
+                      anotacao,
+                      categoria,
+                      dataUpload: new Date().toISOString()
+                    });
+                  }
+                } catch (err) {
+                  console.error(`Erro ao fazer upload de ${categoria}:`, err);
+                } finally {
+                  resolve();
+                }
+              };
+              reader.onerror = () => resolve();
+              reader.readAsDataURL(file);
+            });
+          };
+
+          if (formData.documento1) {
+            await uploadDocumento(formData.documento1, 'menkyo', 'Menkyo (Documento 1)');
+          }
+
+          if (formData.documento2) {
+            await uploadDocumento(formData.documento2, 'zairyu', 'Zairyu (Documento 2)');
+          }
+        } catch (uploadError) {
+          console.error('Erro durante upload de documentos:', uploadError);
+          // Não bloqueia o fluxo se falhar o upload
+        }
+      }
+
       handleCloseForm();
       fetchClientes();
     } catch (error) {
@@ -450,6 +527,46 @@ const Clientes = () => {
             onChange={handleInputChange}
             sx={{ mb: 2 }}
           />
+          <Box sx={{ mt: 3, mb: 2, p: 1.5, border: '1px solid #ddd', borderRadius: 1, bgcolor: '#f9f9f9' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
+              Documentos (Opcional)
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <input
+                ref={documento1Ref}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => handleFileChange(e, 'documento1')}
+                style={{ display: 'none' }}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                onClick={() => documento1Ref.current?.click()}
+                sx={{ mb: 1 }}
+              >
+                {formData.documento1 ? `✓ ${formData.documento1.name}` : 'Menkyo (Documento 1)'}
+              </Button>
+            </Box>
+            <Box>
+              <input
+                ref={documento2Ref}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => handleFileChange(e, 'documento2')}
+                style={{ display: 'none' }}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                onClick={() => documento2Ref.current?.click()}
+              >
+                {formData.documento2 ? `✓ ${formData.documento2.name}` : 'Zairyu (Documento 2)'}
+              </Button>
+            </Box>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseForm} color="inherit">

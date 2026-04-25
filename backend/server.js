@@ -256,6 +256,7 @@ const ENTITY_ROUTES = {
       juros: 'juros',
       valorTotal: 'valor_total',
       parcelas_status_json: 'parcelas_status_json',
+      veiculoId: 'veiculo_id',
       reciboPDF: 'recibo_pdf',
       reciboGeradoEm: 'recibo_gerado_em',
       created_at: 'created_at',
@@ -740,9 +741,51 @@ app.post('/api/auth/change-password', safeRoute(async (req, res) => {
   return res.json({ success: true });
 }));
 
+// Rota customizada para POST /api/vendas_carros com baixa de estoque
+app.post('/api/vendas_carros', safeRoute(async (req, res) => {
+  const entityDef = ENTITY_ROUTES.vendas_carros;
+  const dbPayload = toDbPayload(entityDef, req.body || {});
+  
+  if (!dbPayload[entityDef.idColumn]) {
+    dbPayload[entityDef.idColumn] = generateId(entityDef.idPrefix);
+  }
+
+  const columns = Object.keys(dbPayload);
+  const values = Object.values(dbPayload);
+  const placeholders = columns.map(() => '?').join(', ');
+
+  // Inserir venda
+  await query(
+    `INSERT INTO ${entityDef.table} (${columns.join(', ')}) VALUES (${placeholders})`,
+    values
+  );
+
+  // Se veiculoId foi informado, fazer a baixa de estoque
+  if (req.body.veiculoId) {
+    try {
+      await query(
+        'UPDATE veiculos SET status = ? WHERE id = ?',
+        ['vendido', req.body.veiculoId]
+      );
+    } catch (updateError) {
+      console.error('Erro ao atualizar status do veículo:', updateError);
+      // Não bloqueia a resposta se falhar o UPDATE
+    }
+  }
+
+  // Retornar registro criado
+  const created = await getEntityById('vendas_carros', dbPayload[entityDef.idColumn]);
+  return res.status(201).json(created);
+}));
+
 Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
+  // Pular vendas_carros pois já tem rota customizada
+  if (resource === 'vendas_carros') return;
   registerEntityRoutes(resource, entityDef);
 });
+
+// Registrar rota genérica para vendas_carros (GET, PUT, PATCH, DELETE), POST já está customizado
+registerEntityRoutes('vendas_carros', ENTITY_ROUTES.vendas_carros);
 
 app.use((error, _req, res, _next) => {
   const normalized = normalizeDatabaseError(error);

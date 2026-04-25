@@ -59,6 +59,7 @@ interface VendaCarro {
   clienteNome?: string;
   clienteTelefone?: string;
   clienteEndereco?: string;
+  veiculoId?: string;
   reciboPDF?: string;
   reciboGeradoEm?: string;
   contratoPath?: string;
@@ -76,6 +77,7 @@ interface VendaCarroFormData {
   juros: number | '';
   clienteId: string;
   clienteNome: string;
+  veiculoId?: string;
 }
 
 interface ConfiguracaoEmpresa {
@@ -119,6 +121,7 @@ const vendaCarroVazio: VendaCarroFormData = {
   juros: 0,
   clienteId: '',
   clienteNome: '',
+  veiculoId: '',
 };
 
 const VendasCarros = () => {
@@ -235,6 +238,7 @@ const VendasCarros = () => {
         juros: vendaCarro.juros ?? 0,
         clienteId: vendaCarro.clienteId || '',
         clienteNome: vendaCarro.clienteNome || '',
+        veiculoId: vendaCarro.veiculoId || '',
       });
       setEditingId(vendaCarro.id);
     } else {
@@ -357,6 +361,7 @@ const VendasCarros = () => {
         clienteNome: sanitizeText(formData.clienteNome || '', 100) || undefined,
         clienteTelefone: sanitizeText(clienteSelecionado?.telefone || '', 40) || undefined,
         clienteEndereco: sanitizeMultilineText(clienteSelecionado?.endereco || '', 250) || undefined,
+        veiculoId: formData.veiculoId || undefined,
       };
 
       if (editingId) {
