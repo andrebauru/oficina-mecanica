@@ -12,6 +12,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import { useLanguage } from './LanguageContext';
 
@@ -70,9 +71,8 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const backendBaseUrl = import.meta.env.DEV
-    ? 'http://localhost:3001'
-    : window.location.origin;
+  const backendBaseUrl = import.meta.env.VITE_API_BASE_URL
+    || (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
 
   const resolveFileUrl = (doc: Documento) => {
     const fileUrl = doc.caminho || doc.base64 || doc.filePath || '';
@@ -225,6 +225,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                     {(() => {
                       const fileUrl = resolveFileUrl(doc);
                       const isPdf = isPdfFile(fileUrl, doc.filename);
+                      const handleView = () => window.open(fileUrl, '_blank');
 
                       if (!fileUrl) {
                         return (
@@ -247,12 +248,22 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
 
                       if (isPdf) {
                         return (
-                          <Box sx={{ height: 170, bgcolor: '#f5f5f5' }}>
-                            <iframe
-                              src={fileUrl}
-                              title={doc.filename}
-                              style={{ width: '100%', height: '100%', border: 'none' }}
-                            />
+                          <Box
+                            sx={{
+                              height: 170,
+                              bgcolor: '#f5f5f5',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 1,
+                              p: 1,
+                            }}
+                          >
+                            <PictureAsPdfIcon color="error" sx={{ fontSize: 42 }} />
+                            <Button size="small" variant="outlined" onClick={handleView}>
+                              Abrir/Baixar
+                            </Button>
                           </Box>
                         );
                       }
@@ -306,7 +317,8 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
                             onClick={() => {
                               const fileUrl = resolveFileUrl(doc);
                               if (fileUrl) {
-                                window.open(fileUrl, '_blank');
+                                const handleView = () => window.open(fileUrl, '_blank');
+                                handleView();
                               }
                             }}
                           >

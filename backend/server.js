@@ -588,7 +588,7 @@ app.use(cors({
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 // Servir arquivos estáticos de uploads
-app.use('/uploads', express.static('/var/www/hiratacars.jp/backend/uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(session({
   secret: env.sessionSecret,
   resave: false,
@@ -843,6 +843,10 @@ app.get('/api/documentos/:entityType/:entityId', safeRoute(async (req, res) => {
        ORDER BY data_upload DESC`,
       [entityType, entityId]
     );
+
+    const debugUrls = rows.map((doc) => doc?.caminho || doc?.base64 || null).filter(Boolean);
+    console.info('[GET /api/documentos/:entityType/:entityId] URLs enviadas:', debugUrls);
+
     return res.json(rows);
   } catch (err) {
     console.error('[GET /api/documentos/:entityType/:entityId] Erro ao listar documentos:', err);
