@@ -175,6 +175,7 @@ const ENTITY_ROUTES = {
       placa: 'placa',
       chassi: 'chassi',
       kilometragem: 'kilometragem',
+      status: 'status',
       data_venda: 'data_venda',
       nova_placa: 'nova_placa',
       data_transferencia: 'data_transferencia',
@@ -780,10 +781,28 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
     // Salvar arquivo físico
     fs.writeFileSync(fileDest, Buffer.from(base64Data, 'base64'));
 
-    // Montar INSERT — campo base64 recebe o caminho relativo (satisfaz NOT NULL e evita salvar dados binários no DB)
+    // Montar INSERT usando somente as colunas que o schema garante existirem
     const newId = generateId('doc');
-    const cols = ['id', 'entity_id', 'entity_type', 'base64', 'filename', 'anotacao', 'categoria', 'data_upload', 'arquivo_original', 'referencia_id', 'referencia_tipo'];
-    const vals = [newId, entityId, entityType, filePathRelativo, filename, anotacao || null, categoria || null, dataUpload || new Date().toISOString(), arquivoOriginal || filename, referenciaId || null, referenciaTipo || null];
+    const dataUploadFinal = dataUpload
+      ? new Date(dataUpload).toISOString().slice(0, 19).replace('T', ' ')
+      : new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    // Colunas obrigatórias + opcionais sempre presentes no schema
+    const cols = ['id', 'entity_id', 'entity_type', 'base64', 'filename', 'data_upload'];
+    const vals = [newId, entityId, entityType, filePathRelativo, filename, dataUploadFinal];
+
+    // Colunas opcionais (nullable) — adicionar só se tiver valor
+    if (anotacao)     { cols.push('anotacao');      vals.push(anotacao); }
+    if (categoria)    { cols.push('categoria');     vals.push(categoria); }
+    if (referenciaId) { cols.push('referencia_id'); vals.push(referenciaId); }
+    if (referenciaTipo) { cols.push('referencia_tipo'); vals.push(referenciaTipo); }
+
+    // arquivo_original — adicionar somente se a coluna existir
+    try {
+      await query('SELECT arquivo_original FROM documentos LIMIT 0');
+      cols.push('arquivo_original');
+      vals.push(arquivoOriginal || filename);
+    } catch { /* coluna não existe, ignorar */ }
 
     await query(
       `INSERT INTO documentos (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,

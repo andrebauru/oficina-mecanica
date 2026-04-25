@@ -93,7 +93,9 @@ interface VeiculoCadastro {
   marca: string;
   modelo: string;
   ano?: number;
+  placa?: string;
   kilometragem?: number;
+  status?: string;
 }
 
 type IdiomaContrato = 'pt' | 'ja' | 'fil' | 'vi' | 'id' | 'en';
@@ -154,6 +156,7 @@ const VendasCarros = () => {
   const [clientes, setClientes] = useState<Array<{id: string; nome: string; telefone?: string; endereco?: string}>>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<{id: string; nome: string; telefone?: string; endereco?: string} | null>(null);
   const [veiculosCadastrados, setVeiculosCadastrados] = useState<VeiculoCadastro[]>([]);
+  const [veiculosDisponiveis, setVeiculosDisponiveis] = useState<VeiculoCadastro[]>([]);
   const [veiculoSelecionadoId, setVeiculoSelecionadoId] = useState('');
   const [configEmpresa, setConfigEmpresa] = useState<ConfiguracaoEmpresa>({});
   const [idiomasContrato, setIdiomasContrato] = useState<IdiomaContrato[]>(IDIOMAS_CONTRATO_PADRAO);
@@ -184,8 +187,12 @@ const VendasCarros = () => {
 
   const recarregarVeiculosDisponiveis = async () => {
     try {
-      const response = await axios.get('/api/veiculos');
-      setVeiculosCadastrados(response.data || []);
+      const [todosRes, disponiveisRes] = await Promise.all([
+        axios.get('/api/veiculos').catch(() => ({ data: [] })),
+        axios.get('/api/veiculos?status=disponivel').catch(() => ({ data: [] })),
+      ]);
+      setVeiculosCadastrados(todosRes.data || []);
+      setVeiculosDisponiveis(disponiveisRes.data || []);
     } catch {
       // sem bloqueio de fluxo
     }
@@ -197,11 +204,13 @@ const VendasCarros = () => {
       axios.get('/api/clientes').catch(() => ({ data: [] })),
       axios.get('/api/configuracoes').catch(() => ({ data: [] })),
       axios.get('/api/veiculos').catch(() => ({ data: [] })),
+      axios.get('/api/veiculos?status=disponivel').catch(() => ({ data: [] })),
     ])
-      .then(([clientesRes, configRes, veiculosRes]) => {
+      .then(([clientesRes, configRes, veiculosRes, disponiveisRes]) => {
         setClientes(clientesRes.data);
         setConfigEmpresa(configRes.data?.[0] || {});
         setVeiculosCadastrados(veiculosRes.data || []);
+        setVeiculosDisponiveis(disponiveisRes.data || []);
       })
       .catch(() => {});
   }, []);
@@ -795,15 +804,22 @@ const VendasCarros = () => {
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12}>
               <FormControl fullWidth>
-                <InputLabel>Veículo já cadastrado (opcional)</InputLabel>
+                <InputLabel>Veículo do Estoque</InputLabel>
                 <Select
                   value={veiculoSelecionadoId}
-                  label="Veículo já cadastrado (opcional)"
+                  label="Veículo do Estoque"
                   onChange={(e) => {
                     const veiculoId = e.target.value;
                     setVeiculoSelecionadoId(veiculoId);
-                    const veiculo = veiculosCadastrados.find((item) => item.id === veiculoId);
-                    if (!veiculo) return;
+
+                    // Buscar em todos os cadastrados (edição pode ter veículo já vendido)
+                    const veiculo = veiculosCadastrados.find((item) => item.id === veiculoId)
+                      || veiculosDisponiveis.find((item) => item.id === veiculoId);
+
+                    if (!veiculo) {
+                      setFormData((prev) => ({ ...prev, veiculoId: '' }));
+                      return;
+                    }
 
                     const clienteByVeiculo = veiculo.clienteId
                       ? clientes.find((c) => c.id === veiculo.clienteId)
@@ -811,6 +827,7 @@ const VendasCarros = () => {
 
                     setFormData((prev) => ({
                       ...prev,
+                      veiculoId,
                       clienteId: veiculo.clienteId || prev.clienteId,
                       clienteNome: clienteByVeiculo?.nome || prev.clienteNome,
                       fabricante: veiculo.marca || prev.fabricante,
@@ -820,14 +837,23 @@ const VendasCarros = () => {
                     }));
                   }}
                 >
-                  <MenuItem value=""><em>Não usar pré-preenchimento</em></MenuItem>
-                  {veiculosCadastrados.map((veiculo) => (
+                  <MenuItem value=""><em>Selecionar veículo do estoque...</em></MenuItem>
+                  {veiculosDisponiveis.map((veiculo) => (
                     <MenuItem key={veiculo.id} value={veiculo.id}>
-                      {veiculo.marca} {veiculo.modelo} {veiculo.ano ? `(${veiculo.ano})` : ''}
+                      {veiculo.marca} {veiculo.modelo}
+                      {veiculo.ano ? ` (${veiculo.ano})` : ''}
+                      {veiculo.placa ? ` — ${veiculo.placa}` : ''}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
+              {veiculoSelecionadoId && formData.fabricante && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  🚗 {formData.fabricante} {formData.modelo}
+                  {formData.ano ? ` • ${formData.ano}` : ''}
+                  {formData.kilometragem ? ` • ${Number(formData.kilometragem).toLocaleString('pt-BR')} km` : ''}
+                </Typography>
+              )}
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>
@@ -885,51 +911,6 @@ const VendasCarros = () => {
                 onChange={handleInputChange}
                 inputProps={{ min: 0 }}
                 helperText="Esse valor será impresso no recibo PDF da venda."
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="fabricante"
-                label="Fabricante"
-                type="text"
-                fullWidth
-                variant="outlined"
-                value={formData.fabricante}
-                onChange={handleInputChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="modelo"
-                label="Modelo"
-                type="text"
-                fullWidth
-                variant="outlined"
-                value={formData.modelo}
-                onChange={handleInputChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="ano"
-                label="Ano"
-                type="number"
-                fullWidth
-                variant="outlined"
-                value={formData.ano}
-                onChange={handleInputChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="kilometragem"
-                label="Kilometragem"
-                type="number"
-                fullWidth
-                variant="outlined"
-                value={formData.kilometragem}
-                onChange={handleInputChange}
-                inputProps={{ min: 0 }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
