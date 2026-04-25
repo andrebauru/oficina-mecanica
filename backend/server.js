@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const env = require('./src/config/env');
 const { testConnection, query, normalizeDatabaseError } = require('./src/config/database');
 const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout');
@@ -302,8 +304,8 @@ const ENTITY_ROUTES = {
       id: 'id',
       entityId: 'entity_id',
       entityType: 'entity_type',
-      base64: 'base64',
       filename: 'filename',
+      filePath: 'file_path',
       anotacao: 'anotacao',
       categoria: 'categoria',
       referenciaId: 'referencia_id',
@@ -580,8 +582,10 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie'],
   optionsSuccessStatus: 200,
 }));
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Servir arquivos estáticos de uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(session({
   secret: env.sessionSecret,
   resave: false,
@@ -741,6 +745,81 @@ app.post('/api/auth/change-password', safeRoute(async (req, res) => {
   return res.json({ success: true });
 }));
 
+// ─── Rotas customizadas de documentos (salvamento físico em arquivo) ─────────
+app.post('/api/documentos', safeRoute(async (req, res) => {
+  try {
+    const {
+      entityId,
+      entityType,
+      base64,
+      filename,
+      anotacao,
+      categoria,
+      referenciaId,
+      referenciaTipo,
+      arquivoOriginal,
+      dataUpload,
+    } = req.body || {};
+
+    if (!entityId || !entityType || !base64 || !filename) {
+      return res.status(400).json({ message: 'entityId, entityType, base64 e filename são obrigatórios.' });
+    }
+
+    // Remover prefixo de Data URL (ex: data:image/jpeg;base64,)
+    const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
+
+    // Garantir que a pasta de uploads exista
+    const uploadDir = path.join(__dirname, 'uploads', 'documentos');
+    fs.mkdirSync(uploadDir, { recursive: true });
+
+    // Nome único para o arquivo
+    const safeName = `${Date.now()}_${filename.replace(/\s+/g, '_')}`;
+    const fileDest = path.join(uploadDir, safeName);
+    const filePathRelativo = `/uploads/documentos/${safeName}`;
+
+    // Salvar arquivo físico
+    fs.writeFileSync(fileDest, Buffer.from(base64Data, 'base64'));
+
+    // Montar INSERT — campo base64 recebe o caminho relativo (satisfaz NOT NULL e evita salvar dados binários no DB)
+    const newId = generateId('doc');
+    const cols = ['id', 'entity_id', 'entity_type', 'base64', 'filename', 'anotacao', 'categoria', 'data_upload', 'arquivo_original', 'referencia_id', 'referencia_tipo'];
+    const vals = [newId, entityId, entityType, filePathRelativo, filename, anotacao || null, categoria || null, dataUpload || new Date().toISOString(), arquivoOriginal || filename, referenciaId || null, referenciaTipo || null];
+
+    await query(
+      `INSERT INTO documentos (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+      vals
+    );
+
+    return res.status(201).json({
+      id: newId,
+      entityId,
+      entityType,
+      filename,
+      filePath: filePathRelativo,
+      anotacao: anotacao || null,
+      categoria: categoria || null,
+    });
+  } catch (err) {
+    console.error('[POST /api/documentos] Erro ao salvar documento:', err);
+    throw err;
+  }
+}));
+
+app.get('/api/documentos/:entityType/:entityId', safeRoute(async (req, res) => {
+  try {
+    const { entityType, entityId } = req.params;
+    const rows = await query(
+      'SELECT * FROM documentos WHERE entity_type = ? AND entity_id = ? ORDER BY data_upload DESC',
+      [entityType, entityId]
+    );
+    return res.json(rows);
+  } catch (err) {
+    console.error('[GET /api/documentos/:entityType/:entityId] Erro ao listar documentos:', err);
+    throw err;
+  }
+}));
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Rota customizada para POST /api/vendas_carros com baixa de estoque
 app.post('/api/vendas_carros', safeRoute(async (req, res) => {
   const entityDef = ENTITY_ROUTES.vendas_carros;
@@ -779,13 +858,17 @@ app.post('/api/vendas_carros', safeRoute(async (req, res) => {
 }));
 
 Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
-  // Pular vendas_carros pois já tem rota customizada
+  // Pular recursos com rotas POST customizadas
   if (resource === 'vendas_carros') return;
+  if (resource === 'documentos') return;
   registerEntityRoutes(resource, entityDef);
 });
 
 // Registrar rota genérica para vendas_carros (GET, PUT, PATCH, DELETE), POST já está customizado
 registerEntityRoutes('vendas_carros', ENTITY_ROUTES.vendas_carros);
+
+// Registrar rotas genéricas para documentos (GET list, GET/:id, PUT, PATCH, DELETE), POST já está customizado
+registerEntityRoutes('documentos', ENTITY_ROUTES.documentos);
 
 app.use((error, _req, res, _next) => {
   const normalized = normalizeDatabaseError(error);
