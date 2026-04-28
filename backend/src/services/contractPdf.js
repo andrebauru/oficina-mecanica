@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
 
-const BLANK_FIELD = '_______________________';
+const BLANK_FIELD = '_______________';
 
 const LANGUAGE_LOCALES = {
   pt: 'pt-BR',
@@ -32,9 +32,9 @@ function escapeHtml(value) {
 }
 
 function toDate(value, locale = 'pt-BR') {
-  if (!value) return BLANK_FIELD;
+  if (!value) return safeField(null);
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return BLANK_FIELD;
+  if (Number.isNaN(date.getTime())) return safeField(null);
   return date.toLocaleDateString(locale);
 }
 
@@ -74,7 +74,7 @@ function buildInstallments(venda) {
       numero: index + 1,
       data: dueDate,
       valor: valorParcela,
-      multa: BLANK_FIELD,
+      multa: safeField(null),
     };
   });
 
@@ -455,7 +455,7 @@ function contractTemplateByLanguage(language = 'pt') {
     pt: {
       locale: 'pt-BR',
       title: 'CONTRATO PARTICULAR DE COMPRA E VENDA DE VEÍCULO USADO',
-      sellerLabel: 'DIRETOR (VENDEDOR)',
+      sellerLabel: 'Empresa (Vendedor)',
       buyerLabel: 'COMPRADOR',
       generatedAtLabel: 'Gerado em',
       paymentHeaders: ['PRESTAÇÃO', 'DATA', 'VALOR', 'MULTA'],
@@ -466,13 +466,16 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Sinal',
         parcelas: 'Parcelas',
         localDate: 'Cidade/Data',
+        cnh: 'CNH',
+        endereco: 'Endereço',
+        telefone: 'Telefone',
       },
-      signatures: ['Diretor', 'Comprador', 'Houshonin', 'Carimbo (印鑑)'],
+      signatures: ['Empresa (Vendedor)', 'Comprador', 'Avalista', 'Carimbo (印鑑)'],
     },
     ja: {
       locale: 'ja-JP',
       title: '中古車売買契約書',
-      sellerLabel: '売主（会社代表）',
+      sellerLabel: '会社 (売主)',
       buyerLabel: '買主',
       generatedAtLabel: '作成日時',
       paymentHeaders: ['回', '期日', '金額', '遅延損害金'],
@@ -483,13 +486,16 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: '頭金',
         parcelas: '分割',
         localDate: '作成地/日付',
+        cnh: '運転免許証 (CNH)',
+        endereco: '住所',
+        telefone: '電話',
       },
-      signatures: ['代表者', '買主', 'Houshonin', '印鑑'],
+      signatures: ['会社 (売主)', '買主', '保証人 (Avalista)', '印鑑'],
     },
     fil: {
       locale: 'fil-PH',
       title: 'KONTRATA NG BILIHAN NG GINAMIT NA SASAKYAN',
-      sellerLabel: 'DIREKTOR (NAGBEBENTA)',
+      sellerLabel: 'Kumpanya (Nagbebenta)',
       buyerLabel: 'MAMIMILI',
       generatedAtLabel: 'Nabuo noong',
       paymentHeaders: ['HULOG', 'PETSA', 'HALAGA', 'MULTA'],
@@ -500,13 +506,16 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Sinal',
         parcelas: 'Mga Hulog',
         localDate: 'Lungsod/Petsa',
+        cnh: 'Lisensya sa Pagmamaneho',
+        endereco: 'Address',
+        telefone: 'Telepono',
       },
-      signatures: ['Direktor', 'Mamimili', 'Houshonin', 'Selyo (印鑑)'],
+      signatures: ['Kumpanya (Nagbebenta)', 'Mamimili', 'Tagapanagot', 'Selyo (印鑑)'],
     },
     vi: {
       locale: 'vi-VN',
       title: 'HỢP ĐỒNG MUA BÁN XE ĐÃ QUA SỬ DỤNG',
-      sellerLabel: 'BÊN BÁN (GIÁM ĐỐC)',
+      sellerLabel: 'Công ty (Người bán)',
       buyerLabel: 'BÊN MUA',
       generatedAtLabel: 'Tạo lúc',
       paymentHeaders: ['KỲ', 'NGÀY', 'GIÁ TRỊ', 'PHẠT'],
@@ -517,13 +526,16 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Đặt cọc',
         parcelas: 'Trả góp',
         localDate: 'Địa điểm/Ngày',
+        cnh: 'Giấy phép lái xe',
+        endereco: 'Địa chỉ',
+        telefone: 'Điện thoại',
       },
-      signatures: ['Giám đốc', 'Bên mua', 'Houshonin', 'Con dấu (印鑑)'],
+      signatures: ['Công ty (Người bán)', 'Bên mua', 'Người bảo lãnh', 'Con dấu (印鑑)'],
     },
     id: {
       locale: 'id-ID',
       title: 'PERJANJIAN JUAL BELI MOBIL BEKAS',
-      sellerLabel: 'PENJUAL (DIREKTUR)',
+      sellerLabel: 'Perusahaan (Penjual)',
       buyerLabel: 'PEMBELI',
       generatedAtLabel: 'Dibuat pada',
       paymentHeaders: ['ANGSURAN', 'TANGGAL', 'NILAI', 'DENDA'],
@@ -534,13 +546,16 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Uang Muka',
         parcelas: 'Cicilan',
         localDate: 'Kota/Tanggal',
+        cnh: 'Surat Izin Mengemudi (SIM)',
+        endereco: 'Alamat',
+        telefone: 'Telepon',
       },
-      signatures: ['Direktur', 'Pembeli', 'Houshonin', 'Stempel (印鑑)'],
+      signatures: ['Perusahaan (Penjual)', 'Pembeli', 'Penjamin', 'Stempel (印鑑)'],
     },
     en: {
       locale: 'en-US',
       title: 'PRIVATE USED VEHICLE PURCHASE AND SALE AGREEMENT',
-      sellerLabel: 'SELLER (DIRECTOR)',
+      sellerLabel: 'Company (Seller)',
       buyerLabel: 'BUYER',
       generatedAtLabel: 'Generated at',
       paymentHeaders: ['INSTALLMENT', 'DATE', 'AMOUNT', 'PENALTY'],
@@ -551,8 +566,11 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Down Payment',
         parcelas: 'Installments',
         localDate: 'City/Date',
+        cnh: "Driver's License",
+        endereco: 'Address',
+        telefone: 'Phone',
       },
-      signatures: ['Director', 'Buyer', 'Houshonin', 'Seal (印鑑)'],
+      signatures: ['Company (Seller)', 'Buyer', 'Guarantor', 'Seal (印鑑)'],
     },
   };
 
@@ -589,6 +607,7 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
   const compradorNome = safeField(payload.cliente?.nome || payload.venda?.cliente_nome || 'Comprador');
   const compradorEndereco = safeField(payload.cliente?.endereco);
   const compradorDoc = safeField(payload.cliente?.cnh_number);
+  const compradorTelefone = safeField(payload.cliente?.telefone);
   const compradorNacionalidade = safeField(payload.cliente?.nacionalidade);
   const compradorProfissao = safeField(payload.cliente?.profissao);
   const compradorEstadoCivil = safeField(payload.cliente?.estado_civil || payload.cliente?.estadoCivil);
@@ -623,7 +642,7 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
   return `
     <section class="contract-page ${isLastLanguage ? '' : 'page-break'}" lang="${escapeHtml(language)}">
       <header class="company-header">
-        ${logoSrc ? `<div class="company-logo"><img src="${logoSrc}" alt="Hirata Cars Shop" /></div>` : ''}
+        ${logoSrc ? `<img src="${logoSrc}" class="header-logo" alt="Hirata Cars" />` : ''}
         <h1>Hirata Cars Shop</h1>
         <p><strong>Telefone:</strong> ${escapeHtml(empresaTelefone)} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>古物商許可:</strong> ${escapeHtml(empresaLicenca)}</p>
       </header>
@@ -633,10 +652,11 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
       <section class="parties">
         <p><strong>${escapeHtml(template.sellerLabel)}:</strong> <strong>${escapeHtml(empresaNome)}</strong></p>
         <p><strong>${escapeHtml(empresaNacionalidade)}</strong> | <strong>${escapeHtml(empresaProfissao)}</strong> | <strong>${escapeHtml(empresaEstadoCivil)}</strong></p>
-        <p>Menkyo: <strong>${escapeHtml(empresaLicenca)}</strong> | Endereço: <strong>${escapeHtml(empresaEndereco)}</strong></p>
+        <p>${escapeHtml(template.labels.cnh)}: <strong>${escapeHtml(empresaLicenca)}</strong> | ${escapeHtml(template.labels.endereco)}: <strong>${escapeHtml(empresaEndereco)}</strong></p>
         <p><strong>${escapeHtml(template.buyerLabel)}:</strong> <strong>${escapeHtml(compradorNome)}</strong></p>
+        <p>${escapeHtml(template.labels.telefone)}: <strong>${escapeHtml(compradorTelefone)}</strong></p>
         <p><strong>${escapeHtml(compradorNacionalidade)}</strong> | <strong>${escapeHtml(compradorProfissao)}</strong> | <strong>${escapeHtml(compradorEstadoCivil)}</strong></p>
-        <p>Menkyo: <strong>${escapeHtml(compradorDoc)}</strong> | Endereço: <strong>${escapeHtml(compradorEndereco)}</strong></p>
+        <p>${escapeHtml(template.labels.cnh)}: <strong>${escapeHtml(compradorDoc)}</strong> | ${escapeHtml(template.labels.endereco)}: <strong>${escapeHtml(compradorEndereco)}</strong></p>
       </section>
 
       <p class="intro">${escapeHtml(template.intro)}</p>
@@ -676,34 +696,44 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
   `;
 }
 
-function resolveLogoPath() {
+function getLogoBase64() {
+  const candidates = [
+    path.resolve(__dirname, '../../../src/assets/Hirata Logo.svg'),
+    path.resolve(__dirname, '../../../dist/assets/Hirata Logo.svg'),
+    path.resolve(__dirname, '../../../dist/assets/Hirata Logo.png'),
+  ];
+
   try {
     const distAssetsDir = path.resolve(__dirname, '../../../dist/assets');
     if (fs.existsSync(distAssetsDir)) {
       const files = fs.readdirSync(distAssetsDir);
       const logoFile = files.find((file) => {
         const lower = String(file).toLowerCase();
-        return file.startsWith('Hirata Logo') && (lower.endsWith('.svg') || lower.endsWith('.png'));
+        return lower.startsWith('hirata logo') && (lower.endsWith('.svg') || lower.endsWith('.png'));
       });
 
       if (logoFile) {
-        return path.join(distAssetsDir, logoFile);
+        candidates.unshift(path.join(distAssetsDir, logoFile));
       }
     }
   } catch {
     // continua para fallback
   }
 
-  const fallbackPublicSvg = path.resolve(__dirname, '../../../public/Hirata Logo.svg');
-  if (fs.existsSync(fallbackPublicSvg)) return fallbackPublicSvg;
+  for (const logoPath of candidates) {
+    if (!logoPath || !fs.existsSync(logoPath)) continue;
+    const ext = path.extname(logoPath).toLowerCase();
+    const mimeType = ext === '.png' ? 'image/png' : 'image/svg+xml';
+    const base64 = fs.readFileSync(logoPath).toString('base64');
+    return `data:${mimeType};base64,${base64}`;
+  }
 
-  return null;
+  return '';
 }
 
 function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
   const selectedLanguages = Array.isArray(idiomas) && idiomas.length > 0 ? idiomas : ['pt', 'ja'];
-  const logoPath = resolveLogoPath();
-  const logoSrc = logoPath ? encodeURI(`file://${logoPath.replace(/\\/g, '/')}`) : '';
+  const logoSrc = getLogoBase64();
 
   const sections = selectedLanguages
     .map((language, index) => {
@@ -762,9 +792,14 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
             margin-bottom: 8px;
           }
 
-          .company-logo img {
-            max-height: 48px;
-            width: auto;
+          .header-logo {
+            max-width: 180px;
+            max-height: 70px;
+            object-fit: contain;
+            margin-bottom: 10px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
           }
 
           .company-header h1 {
