@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
 
-const BLANK_FIELD = '_______________';
+const BLANK_FIELD = '_______________________';
 
 const LANGUAGE_LOCALES = {
   pt: 'pt-BR',
@@ -466,6 +466,7 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Sinal',
         parcelas: 'Parcelas',
         localDate: 'Cidade/Data',
+        companyLicense: 'Licença da Empresa',
         cnh: 'CNH',
         endereco: 'Endereço',
         telefone: 'Telefone',
@@ -486,11 +487,12 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: '頭金',
         parcelas: '分割',
         localDate: '作成地/日付',
+        companyLicense: '古物商許可',
         cnh: '運転免許証 (CNH)',
         endereco: '住所',
         telefone: '電話',
       },
-      signatures: ['会社 (売主)', '買主', '保証人 (Avalista)', '印鑑'],
+      signatures: ['会社 (売主)', '買主', '保証人 (Avalista)', 'Carimbo (印鑑)'],
     },
     fil: {
       locale: 'fil-PH',
@@ -506,11 +508,12 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Sinal',
         parcelas: 'Mga Hulog',
         localDate: 'Lungsod/Petsa',
+        companyLicense: 'Lisensya ng Kumpanya',
         cnh: 'Lisensya sa Pagmamaneho',
         endereco: 'Address',
         telefone: 'Telepono',
       },
-      signatures: ['Kumpanya (Nagbebenta)', 'Mamimili', 'Tagapanagot', 'Selyo (印鑑)'],
+      signatures: ['Kumpanya (Nagbebenta)', 'Mamimili', 'Tagapanagot', 'Carimbo (印鑑)'],
     },
     vi: {
       locale: 'vi-VN',
@@ -526,11 +529,12 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Đặt cọc',
         parcelas: 'Trả góp',
         localDate: 'Địa điểm/Ngày',
+        companyLicense: 'Giấy phép công ty',
         cnh: 'Giấy phép lái xe',
         endereco: 'Địa chỉ',
         telefone: 'Điện thoại',
       },
-      signatures: ['Công ty (Người bán)', 'Bên mua', 'Người bảo lãnh', 'Con dấu (印鑑)'],
+      signatures: ['Công ty (Người bán)', 'Bên mua', 'Người bảo lãnh', 'Carimbo (印鑑)'],
     },
     id: {
       locale: 'id-ID',
@@ -546,11 +550,12 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Uang Muka',
         parcelas: 'Cicilan',
         localDate: 'Kota/Tanggal',
+        companyLicense: 'Izin Perusahaan',
         cnh: 'Surat Izin Mengemudi (SIM)',
         endereco: 'Alamat',
         telefone: 'Telepon',
       },
-      signatures: ['Perusahaan (Penjual)', 'Pembeli', 'Penjamin', 'Stempel (印鑑)'],
+      signatures: ['Perusahaan (Penjual)', 'Pembeli', 'Penjamin', 'Carimbo (印鑑)'],
     },
     en: {
       locale: 'en-US',
@@ -566,11 +571,12 @@ function contractTemplateByLanguage(language = 'pt') {
         sinal: 'Down Payment',
         parcelas: 'Installments',
         localDate: 'City/Date',
-        cnh: "Driver's License",
+        companyLicense: 'Company License',
+        cnh: "Driver's License (CNH)",
         endereco: 'Address',
         telefone: 'Phone',
       },
-      signatures: ['Company (Seller)', 'Buyer', 'Guarantor', 'Seal (印鑑)'],
+      signatures: ['Company (Seller)', 'Buyer', 'Guarantor', 'Carimbo (印鑑)'],
     },
   };
 
@@ -595,6 +601,7 @@ function buildInstallmentRows(payment, locale) {
 function buildLanguageSection(template, payload, language, isLastLanguage, logoSrc) {
   const locale = LANGUAGE_LOCALES[language] || 'pt-BR';
   const generatedAt = new Date().toLocaleString(locale);
+  const cliente = payload.cliente || {};
 
   const empresaNome = safeField(payload.configuracao?.nomeEmpresa || 'Hirata Cars Shop');
   const empresaTelefone = safeField(payload.configuracao?.telefone);
@@ -604,13 +611,13 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
   const empresaProfissao = safeField(payload.configuracao?.profissao);
   const empresaEstadoCivil = safeField(payload.configuracao?.estadoCivil);
 
-  const compradorNome = safeField(payload.cliente?.nome || payload.venda?.cliente_nome || 'Comprador');
-  const compradorEndereco = safeField(payload.cliente?.endereco);
-  const compradorDoc = safeField(payload.cliente?.cnh_number);
-  const compradorTelefone = safeField(payload.cliente?.telefone);
-  const compradorNacionalidade = safeField(payload.cliente?.nacionalidade);
-  const compradorProfissao = safeField(payload.cliente?.profissao);
-  const compradorEstadoCivil = safeField(payload.cliente?.estado_civil || payload.cliente?.estadoCivil);
+  const compradorNome = safeField(cliente?.nome || payload.venda?.cliente_nome || 'Comprador');
+  const compradorEndereco = safeField(cliente?.endereco);
+  const compradorDoc = safeField(cliente?.cnh_number);
+  const compradorTelefone = safeField(cliente?.telefone);
+  const compradorNacionalidade = safeField(cliente?.nacionalidade);
+  const compradorProfissao = safeField(cliente?.profissao);
+  const compradorEstadoCivil = safeField(cliente?.estado_civil || cliente?.estadoCivil);
   const cidade = safeField(payload.configuracao?.cidadeContrato);
 
   const clausesHtml = template.clauses
@@ -652,11 +659,11 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
       <section class="parties">
         <p><strong>${escapeHtml(template.sellerLabel)}:</strong> <strong>${escapeHtml(empresaNome)}</strong></p>
         <p><strong>${escapeHtml(empresaNacionalidade)}</strong> | <strong>${escapeHtml(empresaProfissao)}</strong> | <strong>${escapeHtml(empresaEstadoCivil)}</strong></p>
-        <p>${escapeHtml(template.labels.cnh)}: <strong>${escapeHtml(empresaLicenca)}</strong> | ${escapeHtml(template.labels.endereco)}: <strong>${escapeHtml(empresaEndereco)}</strong></p>
+        <p>${escapeHtml(template.labels.companyLicense)}: <strong>${escapeHtml(empresaLicenca)}</strong> | ${escapeHtml(template.labels.endereco)}: <strong>${escapeHtml(empresaEndereco)}</strong></p>
         <p><strong>${escapeHtml(template.buyerLabel)}:</strong> <strong>${escapeHtml(compradorNome)}</strong></p>
-        <p>${escapeHtml(template.labels.telefone)}: <strong>${escapeHtml(compradorTelefone)}</strong></p>
         <p><strong>${escapeHtml(compradorNacionalidade)}</strong> | <strong>${escapeHtml(compradorProfissao)}</strong> | <strong>${escapeHtml(compradorEstadoCivil)}</strong></p>
         <p>${escapeHtml(template.labels.cnh)}: <strong>${escapeHtml(compradorDoc)}</strong> | ${escapeHtml(template.labels.endereco)}: <strong>${escapeHtml(compradorEndereco)}</strong></p>
+        <p>${escapeHtml(template.labels.telefone)}: <strong>${escapeHtml(compradorTelefone)}</strong></p>
       </section>
 
       <p class="intro">${escapeHtml(template.intro)}</p>
@@ -697,38 +704,13 @@ function buildLanguageSection(template, payload, language, isLastLanguage, logoS
 }
 
 function getLogoBase64() {
-  const candidates = [
-    path.resolve(__dirname, '../../../src/assets/Hirata Logo.svg'),
-    path.resolve(__dirname, '../../../dist/assets/Hirata Logo.svg'),
-    path.resolve(__dirname, '../../../dist/assets/Hirata Logo.png'),
-  ];
-
   try {
-    const distAssetsDir = path.resolve(__dirname, '../../../dist/assets');
-    if (fs.existsSync(distAssetsDir)) {
-      const files = fs.readdirSync(distAssetsDir);
-      const logoFile = files.find((file) => {
-        const lower = String(file).toLowerCase();
-        return lower.startsWith('hirata logo') && (lower.endsWith('.svg') || lower.endsWith('.png'));
-      });
-
-      if (logoFile) {
-        candidates.unshift(path.join(distAssetsDir, logoFile));
-      }
-    }
-  } catch {
-    // continua para fallback
-  }
-
-  for (const logoPath of candidates) {
-    if (!logoPath || !fs.existsSync(logoPath)) continue;
-    const ext = path.extname(logoPath).toLowerCase();
-    const mimeType = ext === '.png' ? 'image/png' : 'image/svg+xml';
+    const logoPath = path.resolve(__dirname, '../../../src/assets/Hirata Logo.svg');
     const base64 = fs.readFileSync(logoPath).toString('base64');
-    return `data:${mimeType};base64,${base64}`;
+    return `data:image/svg+xml;base64,${base64}`;
+  } catch {
+    return '';
   }
-
-  return '';
 }
 
 function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
@@ -787,19 +769,11 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
             margin-bottom: 12px;
           }
 
-          .company-logo {
-            text-align: center;
-            margin-bottom: 8px;
-          }
-
           .header-logo {
-            max-width: 180px;
-            max-height: 70px;
-            object-fit: contain;
-            margin-bottom: 10px;
+            height: 60px;
+            width: auto;
             display: block;
-            margin-left: auto;
-            margin-right: auto;
+            margin: 0 auto 15px auto;
           }
 
           .company-header h1 {
@@ -853,7 +827,6 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload }) {
             margin: 0 0 6px;
             font-size: 13px;
             font-weight: 700;
-            text-decoration: underline;
           }
 
           .installments-table {
@@ -942,7 +915,7 @@ function buildPuppeteerLaunchOptions() {
 async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, cliente, veiculo, configuracao }) {
   const payload = {
     venda,
-    cliente,
+    cliente: cliente || {},
     configuracao,
     veiculo: getVehicleData(venda, veiculo),
     pagamento: buildInstallments(venda),
