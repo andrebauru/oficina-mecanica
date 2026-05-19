@@ -51,6 +51,18 @@ export default function ContratoVendaDialog({
   const [error, setError] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
 
+  const MENSAGEM_CONFIRMAR_SEM_DOCUMENTO = 'Este cliente não possui CNH/Documento anexado. Deseja continuar com a venda e gerar o contrato mesmo assim?';
+
+  const checkClienteTemDocumento = async (): Promise<boolean> => {
+    if (!clienteId) return false;
+    try {
+      const response = await axios.get(`/api/documentos/cliente/${clienteId}`);
+      return Array.isArray(response.data) && response.data.length > 0;
+    } catch {
+      return false;
+    }
+  };
+
   const nomeIdiomaMap: Record<'pt' | 'vi' | 'fil' | 'ja', string> = {
     pt: 'Português (PT)',
     vi: 'Vietnamita (VI)',
@@ -72,6 +84,14 @@ export default function ContratoVendaDialog({
 
       const sinalNum = parseFloat(sinal || '0');
       const parcelasNum = parseInt(parcelas || '1');
+
+      const temDocumento = await checkClienteTemDocumento();
+      if (!temDocumento) {
+        const continuarSemDocumento = window.confirm(MENSAGEM_CONFIRMAR_SEM_DOCUMENTO);
+        if (!continuarSemDocumento) {
+          return;
+        }
+      }
 
       setLoading(true);
 

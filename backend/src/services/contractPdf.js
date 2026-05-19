@@ -912,10 +912,16 @@ function buildPuppeteerLaunchOptions() {
   };
 }
 
-async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, cliente, veiculo, configuracao }) {
+async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, cliente, documento, veiculo, configuracao }) {
+  // Documento de cliente (CNH/Zairyu) é opcional: o PDF deve ser gerado mesmo sem anexo.
+  if (!documento) {
+    // Sem ação necessária; o restante do PDF usa apenas dados textuais.
+  }
+
   const payload = {
     venda,
     cliente: cliente || {},
+    documento: documento || null,
     configuracao,
     veiculo: getVehicleData(venda, veiculo),
     pagamento: buildInstallments(venda),

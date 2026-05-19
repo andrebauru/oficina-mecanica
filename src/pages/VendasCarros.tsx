@@ -37,10 +37,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArticleIcon from '@mui/icons-material/Article';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import { Tooltip } from '@mui/material';
-import DocumentosDialog from '../components/DocumentosDialog';
 import { useSearchParams } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatters';
 import HirataLogo from '../assets/Hirata Logo.svg';
@@ -167,14 +164,12 @@ const VendasCarros = () => {
   const [idiomasContrato, setIdiomasContrato] = useState<IdiomaContrato[]>(IDIOMAS_CONTRATO_PADRAO);
 
   // Estado para validação de documentos e alertas
-  const [docAlertOpen, setDocAlertOpen] = useState(false);
-  const [docAlertClienteId, setDocAlertClienteId] = useState('');
-  const [docAlertClienteNome, setDocAlertClienteNome] = useState('');
-  const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [checkingDoc, setCheckingDoc] = useState(false);
   const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
   const [contratoDialogVendaId, setContratoDialogVendaId] = useState('');
   const [contratoDialogClienteNome, setContratoDialogClienteNome] = useState('');
+
+  const MENSAGEM_CONFIRMAR_SEM_DOCUMENTO = 'Este cliente não possui CNH/Documento anexado. Deseja continuar com a venda e gerar o contrato mesmo assim?';
 
   // Cálculo automático de valorTotal e valorParcela
   const valorBase = Number(formData.valor) || 0;
@@ -325,10 +320,8 @@ const VendasCarros = () => {
       setCheckingDoc(false);
 
       if (!temDoc) {
-        setDocAlertClienteId(clienteId);
-        setDocAlertClienteNome(venda?.clienteNome || 'Cliente');
-        setDocAlertOpen(true);
-        return;
+        const continuarSemDocumento = window.confirm(MENSAGEM_CONFIRMAR_SEM_DOCUMENTO);
+        if (!continuarSemDocumento) return;
       }
     }
 
@@ -522,20 +515,26 @@ const VendasCarros = () => {
           const temDocumento = cId ? await checkClienteTemDocumento(cId) : false;
 
           if (cId && !temDocumento) {
-            setDocAlertClienteId(cId);
-            setDocAlertClienteNome(formData.clienteNome || 'Cliente');
-            setDocAlertOpen(true);
-          } else {
-            const contractResponse = await axios.post(`/api/vendas_carros/${vendaCriada.id}/contracts/generate`, {
-              idiomas: idiomasContrato.length > 0 ? idiomasContrato : IDIOMAS_CONTRATO_PADRAO,
-              documentoVerificado: true,
-            });
-
-            if (contractResponse.data) {
-              setContratoDialogVendaId(String(vendaCriada.id));
-              setContratoDialogClienteNome(clienteSelecionado?.nome || formData.clienteNome || 'Cliente');
-              setContratoDialogOpen(true);
+            const continuarSemDocumento = window.confirm(MENSAGEM_CONFIRMAR_SEM_DOCUMENTO);
+            if (!continuarSemDocumento) {
+              setSnackbar({
+                open: true,
+                message: 'Venda salva. Geração do contrato cancelada pelo usuário.',
+                severity: 'warning',
+              });
+              return;
             }
+          }
+
+          const contractResponse = await axios.post(`/api/vendas_carros/${vendaCriada.id}/contracts/generate`, {
+            idiomas: idiomasContrato.length > 0 ? idiomasContrato : IDIOMAS_CONTRATO_PADRAO,
+            documentoVerificado: !!temDocumento,
+          });
+
+          if (contractResponse.data) {
+            setContratoDialogVendaId(String(vendaCriada.id));
+            setContratoDialogClienteNome(clienteSelecionado?.nome || formData.clienteNome || 'Cliente');
+            setContratoDialogOpen(true);
           }
         } catch (contractError) {
           console.error('Erro ao gerar contrato da venda de carro:', contractError);
@@ -1126,38 +1125,6 @@ const VendasCarros = () => {
         </Box>
       )}
 
-      {/* Dialog de Documentação Pendente */}
-      <Dialog open={docAlertOpen} onClose={() => setDocAlertOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <WarningAmberIcon color="warning" />
-          Documentação Pendente
-        </DialogTitle>
-        <DialogContent>
-          <Typography>
-            Não é possível gerar o contrato pois o cliente não possui CNH/Zairyu anexado.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ flexDirection: 'column', alignItems: 'stretch', gap: 1, p: 2 }}>
-          <Button
-            fullWidth
-            variant="contained"
-            color="warning"
-            startIcon={<FolderOpenIcon />}
-            onClick={() => {
-              setDocAlertOpen(false);
-              setOpenForm(false);
-              setDocDialogOpen(true);
-            }}
-            sx={{ fontWeight: 'bold' }}
-          >
-            Ir para Cliente: {docAlertClienteNome}
-          </Button>
-          <Button fullWidth onClick={() => setDocAlertOpen(false)} color="inherit">
-            Fechar
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Dialog de Imprimir vs Salvar/Visualizar — contrato gerado com sucesso */}
       <Dialog open={contratoDialogOpen} onClose={() => setContratoDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1194,16 +1161,6 @@ const VendasCarros = () => {
         </DialogActions>
       </Dialog>
 
-      {/* DocumentosDialog — fallback para upload de CNH/Zairyu */}
-      {docAlertClienteId && (
-        <DocumentosDialog
-          open={docDialogOpen}
-          onClose={() => setDocDialogOpen(false)}
-          entityId={docAlertClienteId}
-          entityType="cliente"
-          entityNome={docAlertClienteNome}
-        />
-      )}
     </Box>
   );
 };

@@ -58,6 +58,28 @@ function sanitizeFileNamePart(value) {
     .slice(0, 80) || 'Cliente';
 }
 
+async function getOptionalClientDocument(clientId) {
+  if (!clientId) return null;
+
+  try {
+    const rows = await query(
+      `SELECT id, filename, file_type AS fileType, file_path AS filePath, data_upload AS dataUpload
+       FROM documentos
+       WHERE entity_type = 'cliente' AND entity_id = ?
+       ORDER BY data_upload DESC
+       LIMIT 1`,
+      [clientId]
+    );
+    return rows[0] || null;
+  } catch (error) {
+    console.warn('[contracts] Falha ao buscar documento opcional do cliente. Fluxo seguirá sem documento.', {
+      clientId,
+      error: error?.message,
+    });
+    return null;
+  }
+}
+
 // Contratos - vendas sem contrato gerado
 router.get('/vendas_carros/pending-delivery', async (_req, res) => {
   try {
@@ -148,6 +170,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       ? await query('SELECT * FROM clientes WHERE id = ? LIMIT 1', [venda.clienteId])
       : [];
     const cliente = clienteRows[0] || null;
+    const documento = await getOptionalClientDocument(venda.clienteId);
 
     const veiculoRows = await query(
       `SELECT *
@@ -174,6 +197,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       idiomas,
       venda,
       cliente,
+      documento,
       veiculo,
       configuracao,
     });
@@ -195,7 +219,12 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       downloadUrl: `/api/vendas_carros/${venda.id}/contracts/download`,
     });
   } catch (error) {
-    console.error('Erro ao gerar contrato de venda de carro:', error);
+    console.error('Erro detalhado ao gerar contrato de venda de carro:', {
+      vendaId: req.params?.vendaId,
+      body: req.body,
+      message: error?.message,
+      stack: error?.stack,
+    });
     return res.status(500).json({ message: 'Erro ao gerar contrato de venda de carro', error: error.message });
   }
 });
@@ -415,7 +444,11 @@ router.post('/contracts/generate', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Erro ao gerar contrato:', error);
+    console.error('Erro detalhado em /api/contracts/generate:', {
+      body: req.body,
+      message: error?.message,
+      stack: error?.stack,
+    });
     return res.status(500).json({
       message: 'Erro ao gerar contrato',
       error: error.message

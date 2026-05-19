@@ -772,9 +772,10 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
       ? (base64.match(/^data:([^;]+);base64,/)?.[1] || null)
       : null;
     const fileTypeFinal = fileType || inferredFileType;
-    const safeEntityId = String(entityId).replace(/[^a-zA-Z0-9.\-_]/g, '');
-    const safeFilename = String(filename).replace(/[^a-zA-Z0-9.\-_]/g, '') || `arquivo_${Date.now()}`;
-    const entityFolder = `${entityType}_${safeEntityId}`;
+    const safeEntityId = String(entityId).replace(/[^a-zA-Z0-9.\-_]/g, '') || '0';
+    const safeEntityType = String(entityType).replace(/[^a-zA-Z0-9.\-_]/g, '') || 'entity';
+    const safeFilename = (filename || 'doc.jpg').replace(/[^a-zA-Z0-9.\-_]/g, '');
+    const entityFolder = `${safeEntityType}_${safeEntityId}`;
 
     // Garantir que a pasta do cliente exista
     const uploadDir = path.join(__dirname, 'uploads', 'documentos', entityFolder);
@@ -798,17 +799,17 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         docId,
-        entityId,
-        entityType,
-        filePathRelativo,
+        entityId ?? null,
+        entityType ?? null,
+        filePathRelativo ?? null,
         fileTypeFinal || null,
         null,
-        filename,
-        anotacao || null,
-        categoria || null,
-        referenciaId || null,
-        referenciaTipo || null,
-        dataUploadFinal,
+        filename ?? null,
+        anotacao ?? null,
+        categoria ?? null,
+        referenciaId ?? null,
+        referenciaTipo ?? null,
+        dataUploadFinal ?? null,
       ]
     );
 
@@ -824,8 +825,8 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
       categoria: categoria || null,
     });
   } catch (err) {
-    console.error('[POST /api/documentos] Erro ao salvar documento:', err);
-    throw err;
+    console.error('Erro no Upload:', err);
+    return res.status(500).json({ error: err.message });
   }
 }));
 
