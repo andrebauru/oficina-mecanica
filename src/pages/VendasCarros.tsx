@@ -196,14 +196,15 @@ const VendasCarros = () => {
 
   // Abre o documento do cliente em nova aba
   const handleVerDocumentoCliente = async (clienteId: string) => {
-    const backendBaseUrl = import.meta.env.VITE_API_BASE_URL
+    const backendBaseUrl = axios.defaults.baseURL
+      || import.meta.env.VITE_API_BASE_URL
       || (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
     try {
       const res = await axios.get(`/api/documentos/cliente/${clienteId}`);
       const docs = res.data;
       if (Array.isArray(docs) && docs.length > 0) {
         const doc = docs[0];
-        const fileUrl = doc.caminho || doc.base64 || doc.filePath || '';
+        const fileUrl = doc.filePath || '';
         if (fileUrl) {
           const url = /^https?:\/\//i.test(fileUrl)
             ? fileUrl

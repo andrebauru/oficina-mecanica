@@ -210,6 +210,7 @@ const Clientes = () => {
                       entityType: 'cliente',
                       base64,
                       filename: file.name,
+                      fileType: file.type,
                       anotacao,
                       categoria,
                       dataUpload: new Date().toISOString()

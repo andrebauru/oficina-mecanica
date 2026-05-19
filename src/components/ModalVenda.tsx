@@ -337,6 +337,7 @@ const ModalVenda: React.FC<ModalVendaProps> = ({
           entityType: 'cliente',
           base64: reciboImagem,
           filename: reciboPDF.replace('.pdf', '.jpg'),
+          fileType: 'image/jpeg',
           anotacao: `Recibo da venda ${vendaId} • Valor pago: ${formatarMoeda(valorPago)}`,
           dataUpload: new Date().toISOString(),
           categoria: 'recibo_venda',

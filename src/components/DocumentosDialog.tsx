@@ -23,9 +23,8 @@ interface Documento {
   filename: string;
   anotacao: string;
   dataUpload: string;
-  caminho?: string;
   filePath?: string;
-  base64?: string;
+  fileType?: string;
 }
 
 interface Props {
@@ -71,14 +70,14 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const backendBaseUrl = import.meta.env.VITE_API_BASE_URL
+  const backendBaseUrl = axios.defaults.baseURL
+    || import.meta.env.VITE_API_BASE_URL
     || (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
 
   const resolveFileUrl = (doc: Documento) => {
-    const fileUrl = doc.caminho || doc.base64 || doc.filePath || '';
-    if (!fileUrl) return '';
-    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
-    return `${backendBaseUrl}${fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`}`;
+    if (!doc.filePath) return '';
+    if (/^https?:\/\//i.test(doc.filePath)) return doc.filePath;
+    return `${backendBaseUrl}${doc.filePath.startsWith('/') ? doc.filePath : `/${doc.filePath}`}`;
   };
 
   const isPdfFile = (url: string, filename?: string) => {
@@ -120,6 +119,7 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
           entityType,
           base64,
           filename: file.name,
+          fileType: file.type,
           anotacao: '',
           dataUpload: new Date().toISOString(),
         });

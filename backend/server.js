@@ -10,8 +10,6 @@ const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout
 const clientCrmRouter = require('./src/routes/clientCrm');
 const contractsRouter = require('./src/routes/contracts');
 
-const DOCUMENTOS_STORAGE_DIR = '/var/www/hiratacars.jp/backend/uploads/documentos';
-
 // ─── Utilitários de senha (espelho de src/utils/security.ts) ──────────────────
 function legacyHashPassword(str) {
   let h1 = 0xdeadbeef;
@@ -308,12 +306,12 @@ const ENTITY_ROUTES = {
       entityId: 'entity_id',
       entityType: 'entity_type',
       filename: 'filename',
-      filePath: 'caminho',
+      filePath: 'file_path',
+      fileType: 'file_type',
       anotacao: 'anotacao',
       categoria: 'categoria',
       referenciaId: 'referencia_id',
       referenciaTipo: 'referencia_tipo',
-      arquivoOriginal: 'arquivo_original',
       dataUpload: 'data_upload',
       created_at: 'created_at',
       updated_at: 'updated_at',
@@ -756,6 +754,7 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
       entityType,
       base64,
       filename,
+      fileType,
       anotacao,
       categoria,
       referenciaId,
@@ -769,15 +768,20 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
 
     // Remover prefixo de Data URL (ex: data:image/jpeg;base64,)
     const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
+    const inferredFileType = typeof base64 === 'string'
+      ? (base64.match(/^data:([^;]+);base64,/)?.[1] || null)
+      : null;
+    const fileTypeFinal = fileType || inferredFileType;
+    const safeEntityId = String(entityId).replace(/[^a-zA-Z0-9.\-_]/g, '');
+    const safeFilename = String(filename).replace(/[^a-zA-Z0-9.\-_]/g, '') || `arquivo_${Date.now()}`;
+    const entityFolder = `${entityType}_${safeEntityId}`;
 
-    // Garantir que a pasta de uploads exista
-    const uploadDir = DOCUMENTOS_STORAGE_DIR;
+    // Garantir que a pasta do cliente exista
+    const uploadDir = path.join(__dirname, 'uploads', 'documentos', entityFolder);
     fs.mkdirSync(uploadDir, { recursive: true });
 
-    // Nome único para o arquivo
-    const safeName = `${Date.now()}_${filename.replace(/\s+/g, '_')}`;
-    const fileDest = path.join(uploadDir, safeName);
-    const filePathRelativo = `/uploads/documentos/${safeName}`;
+    const fileDest = path.join(uploadDir, safeFilename);
+    const filePathRelativo = `/uploads/documentos/${entityFolder}/${safeFilename}`;
 
     // Salvar arquivo físico
     fs.writeFileSync(fileDest, Buffer.from(base64Data, 'base64'));
@@ -790,19 +794,20 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
     const docId = `doc_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
     const result = await query(
-      `INSERT INTO documentos (id, entity_id, entity_type, base64, filename, anotacao, categoria, referencia_id, referencia_tipo, arquivo_original, data_upload)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO documentos (id, entity_id, entity_type, file_path, file_type, base64, filename, anotacao, categoria, referencia_id, referencia_tipo, data_upload)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         docId,
         entityId,
         entityType,
-        safeName,
+        filePathRelativo,
+        fileTypeFinal || null,
+        null,
         filename,
         anotacao || null,
         categoria || null,
         referenciaId || null,
         referenciaTipo || null,
-        filePathRelativo,
         dataUploadFinal,
       ]
     );
@@ -812,6 +817,7 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
       entityId,
       entityType,
       filename,
+      fileType: fileTypeFinal || null,
       caminho: filePathRelativo,
       filePath: filePathRelativo,
       anotacao: anotacao || null,
@@ -835,16 +841,16 @@ app.get('/api/documentos/:entityType/:entityId', safeRoute(async (req, res) => {
          anotacao,
          categoria,
          data_upload AS dataUpload,
-         arquivo_original AS caminho,
-         arquivo_original AS filePath,
-         arquivo_original AS base64
+         file_path AS caminho,
+         file_path AS filePath,
+         file_type AS fileType
        FROM documentos
        WHERE entity_type = ? AND entity_id = ?
        ORDER BY data_upload DESC`,
       [entityType, entityId]
     );
 
-    const debugUrls = rows.map((doc) => doc?.caminho || doc?.base64 || null).filter(Boolean);
+    const debugUrls = rows.map((doc) => doc?.filePath || doc?.caminho || null).filter(Boolean);
     console.info('[GET /api/documentos/:entityType/:entityId] URLs enviadas:', debugUrls);
 
     return res.json(rows);

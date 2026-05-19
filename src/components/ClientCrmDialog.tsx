@@ -32,8 +32,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 interface ClientDocument {
   id: string;
   categoria?: string;
-  caminho?: string;
-  base64?: string;
+  filePath?: string;
+  fileType?: string;
   filename?: string;
   dataUpload?: string;
 }
@@ -75,7 +75,8 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const backendBaseUrl = import.meta.env.VITE_API_BASE_URL
+  const backendBaseUrl = axios.defaults.baseURL
+    || import.meta.env.VITE_API_BASE_URL
     || (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
 
   useEffect(() => {
@@ -141,6 +142,7 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
         entityType: 'cliente',
         base64: base64Data,
         filename: file.name,
+        fileType: file.type,
         categoria: documentType,
         dataUpload: new Date().toISOString(),
       });
@@ -213,11 +215,9 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
   };
 
   const resolveFileUrl = (doc: ClientDocument) => {
-    const raw = doc.caminho || doc.base64 || '';
-    if (!raw) return '';
-    if (/^https?:\/\//i.test(raw)) return raw;
-    if (raw.startsWith('/uploads')) return `${backendBaseUrl}${raw}`;
-    return `${backendBaseUrl}${raw.startsWith('/') ? raw : `/${raw}`}`;
+    if (!doc.filePath) return '';
+    if (/^https?:\/\//i.test(doc.filePath)) return doc.filePath;
+    return `${backendBaseUrl}${doc.filePath.startsWith('/') ? doc.filePath : `/${doc.filePath}`}`;
   };
 
   const handleView = (fileUrl: string) => window.open(fileUrl, '_blank');
