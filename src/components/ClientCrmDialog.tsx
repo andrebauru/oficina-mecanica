@@ -32,7 +32,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 interface ClientDocument {
   id: string;
   categoria?: string;
+  caminho?: string;
   filePath?: string;
+  base64?: string;
   fileType?: string;
   filename?: string;
   dataUpload?: string;
@@ -215,9 +217,16 @@ const ClientCrmDialog = ({ open, onClose, clientId, clientName }: ClientCrmDialo
   };
 
   const resolveFileUrl = (doc: ClientDocument) => {
-    if (!doc.filePath) return '';
-    if (/^https?:\/\//i.test(doc.filePath)) return doc.filePath;
-    return `${backendBaseUrl}${doc.filePath.startsWith('/') ? doc.filePath : `/${doc.filePath}`}`;
+    let fileUrl = doc.caminho || doc.filePath || doc.base64 || '';
+    if (!fileUrl) return '';
+
+    // Forca a passagem pelo proxy do Nginx para documentos antigos
+    if (fileUrl.startsWith('/uploads')) {
+      fileUrl = `/api${fileUrl}`;
+    }
+
+    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+    return `${backendBaseUrl}${fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`}`;
   };
 
   const handleView = (fileUrl: string) => window.open(fileUrl, '_blank');

@@ -23,7 +23,9 @@ interface Documento {
   filename: string;
   anotacao: string;
   dataUpload: string;
+  caminho?: string;
   filePath?: string;
+  base64?: string;
   fileType?: string;
 }
 
@@ -75,9 +77,16 @@ const DocumentosDialog = ({ open, onClose, entityId, entityType, entityNome }: P
     || (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
 
   const resolveFileUrl = (doc: Documento) => {
-    if (!doc.filePath) return '';
-    if (/^https?:\/\//i.test(doc.filePath)) return doc.filePath;
-    return `${backendBaseUrl}${doc.filePath.startsWith('/') ? doc.filePath : `/${doc.filePath}`}`;
+    let fileUrl = doc.caminho || doc.filePath || doc.base64 || '';
+    if (!fileUrl) return '';
+
+    // Forca a passagem pelo proxy do Nginx para documentos antigos
+    if (fileUrl.startsWith('/uploads')) {
+      fileUrl = `/api${fileUrl}`;
+    }
+
+    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+    return `${backendBaseUrl}${fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`}`;
   };
 
   const isPdfFile = (url: string, filename?: string) => {
