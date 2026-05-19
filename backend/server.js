@@ -803,7 +803,7 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
         entityType ?? null,
         filePathRelativo ?? null,
         fileTypeFinal || null,
-        null,
+        '',
         filename ?? null,
         anotacao ?? null,
         categoria ?? null,
