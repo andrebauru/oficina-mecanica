@@ -51,7 +51,8 @@ router.get('/clients/:clientId/history', async (req, res) => {
   }
 });
 
-
+// GET interações do cliente
+router.get('/clients/:clientId/interactions', async (req, res) => {
   try {
     const { clientId } = req.params;
     const { limit = 50, offset = 0 } = req.query;
