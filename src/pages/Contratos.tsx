@@ -5,6 +5,7 @@ import {
   Typography,
   Paper,
   Table,
+  TableContainer,
   TableHead,
   TableRow,
   TableCell,
@@ -243,8 +244,8 @@ const Contratos = () => {
           <CircularProgress />
         </Box>
       ) : tab === 0 ? (
-        <Paper>
-          <Table size="small">
+        <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
+          <Table size="small" sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell><strong>Cliente</strong></TableCell>
@@ -292,10 +293,10 @@ const Contratos = () => {
               ))}
             </TableBody>
           </Table>
-        </Paper>
+        </TableContainer>
       ) : (
-        <Paper>
-          <Table size="small">
+        <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
+          <Table size="small" sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: 'action.hover' }}>
                 <TableCell><strong>Cliente</strong></TableCell>
@@ -365,7 +366,7 @@ const Contratos = () => {
               })}
             </TableBody>
           </Table>
-        </Paper>
+        </TableContainer>
       )}
     </Box>
   );

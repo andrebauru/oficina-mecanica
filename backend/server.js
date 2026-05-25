@@ -899,7 +899,80 @@ app.post('/api/vendas_carros', safeRoute(async (req, res) => {
   return res.status(201).json(created);
 }));
 
-Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
+// ─── Dashboard financeiro do mês atual ───────────────────────────────────────
+app.get('/api/financeiro/dashboard/mes', safeRoute(async (_req, res) => {
+  let totalRecebidoParcelas = 0;
+  let totalPendenteParcelas = 0;
+  let totalRecebidoVendasParc = 0;
+  let totalPendenteVendasParc = 0;
+  let proximasContas = [];
+
+  // Consulta tabela parcelas (vinculada a vendas)
+  try {
+    const rowsParcelas = await query(
+      `SELECT
+         SUM(CASE WHEN status = 'pago' THEN valor ELSE 0 END) AS totalRecebido,
+         SUM(CASE WHEN status != 'pago' THEN valor ELSE 0 END) AS totalPendente
+       FROM parcelas
+       WHERE MONTH(data_vencimento) = MONTH(CURRENT_DATE())
+         AND YEAR(data_vencimento) = YEAR(CURRENT_DATE())`
+    );
+    totalRecebidoParcelas = Number(rowsParcelas[0]?.totalRecebido || 0);
+    totalPendenteParcelas = Number(rowsParcelas[0]?.totalPendente || 0);
+  } catch {
+    // tabela pode não existir em todos os ambientes
+  }
+
+  // Consulta tabela vendas_parcelas (vinculada a contratos de clientes)
+  try {
+    const rowsVendasParc = await query(
+      `SELECT
+         SUM(CASE WHEN status = 'pago' THEN valor ELSE 0 END) AS totalRecebido,
+         SUM(CASE WHEN status != 'pago' THEN valor ELSE 0 END) AS totalPendente
+       FROM vendas_parcelas
+       WHERE MONTH(data_vencimento) = MONTH(CURRENT_DATE())
+         AND YEAR(data_vencimento) = YEAR(CURRENT_DATE())`
+    );
+    totalRecebidoVendasParc = Number(rowsVendasParc[0]?.totalRecebido || 0);
+    totalPendenteVendasParc = Number(rowsVendasParc[0]?.totalPendente || 0);
+  } catch {
+    // tabela pode não existir em todos os ambientes
+  }
+
+  // Próximas 5 contas a receber (de parcelas + vendas_parcelas combinadas)
+  try {
+    const [nextParcelas, nextVendasParc] = await Promise.all([
+      query(
+        `SELECT p.id, p.cliente_nome AS clienteNome, p.data_vencimento AS dataVencimento, p.valor, p.status
+         FROM parcelas p
+         WHERE p.status != 'pago' AND p.data_vencimento >= CURRENT_DATE()
+         ORDER BY p.data_vencimento ASC LIMIT 5`
+      ).catch(() => []),
+      query(
+        `SELECT vp.id, c.nome AS clienteNome, vp.data_vencimento AS dataVencimento, vp.valor, vp.status
+         FROM vendas_parcelas vp
+         JOIN clientes c ON vp.client_id = c.id
+         WHERE vp.status != 'pago' AND vp.data_vencimento >= CURRENT_DATE()
+         ORDER BY vp.data_vencimento ASC LIMIT 5`
+      ).catch(() => []),
+    ]);
+
+    proximasContas = [...nextParcelas, ...nextVendasParc]
+      .sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime())
+      .slice(0, 5);
+  } catch {
+    // sem dados disponíveis
+  }
+
+  return res.json({
+    totalRecebido: totalRecebidoParcelas + totalRecebidoVendasParc,
+    totalPendente: totalPendenteParcelas + totalPendenteVendasParc,
+    proximasContas,
+  });
+}));
+// ─────────────────────────────────────────────────────────────────────────────
+
+
   // Pular recursos com rotas POST customizadas
   if (resource === 'vendas_carros') return;
   if (resource === 'documentos') return;

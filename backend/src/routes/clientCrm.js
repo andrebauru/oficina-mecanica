@@ -6,8 +6,52 @@ const router = express.Router();
 
 // ===== ROTAS DE INTERAÇÕES CRM =====
 
-// GET interações de um cliente
-router.get('/clients/:clientId/interactions', async (req, res) => {
+// GET histórico 360º do cliente (veículos comprados + ordens de serviço)
+router.get('/clients/:clientId/history', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    const [veiculosComprados, ordensServico] = await Promise.all([
+      query(
+        `SELECT
+           vc.id,
+           vc.fabricante,
+           vc.modelo,
+           vc.ano,
+           vc.valor_total AS valorTotal,
+           vc.created_at AS dataVenda,
+           vc.contratoPath
+         FROM vendas_carros vc
+         WHERE vc.clienteId = ?
+         ORDER BY vc.created_at DESC`,
+        [clientId]
+      ).catch(() => []),
+
+      query(
+        `SELECT
+           os.id,
+           os.dataEntrada,
+           os.status,
+           os.valorTotal,
+           v.marca,
+           v.modelo,
+           v.placa
+         FROM ordens_servico os
+         LEFT JOIN veiculos v ON os.veiculoId = v.id
+         WHERE os.clienteId = ?
+         ORDER BY os.dataEntrada DESC`,
+        [clientId]
+      ).catch(() => []),
+    ]);
+
+    return res.json({ veiculosComprados, ordensServico });
+  } catch (err) {
+    console.error('[GET /clients/:id/history]', err);
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+
   try {
     const { clientId } = req.params;
     const { limit = 50, offset = 0 } = req.query;

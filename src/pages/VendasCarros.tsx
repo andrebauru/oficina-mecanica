@@ -717,8 +717,8 @@ const VendasCarros = () => {
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper} elevation={3} sx={{ overflowX: 'auto' }}>
-          <Table>
+        <TableContainer component={Paper} elevation={3} sx={{ width: '100%', overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 650 }}>
             <TableHead>
               <TableRow>
                 <TableCell>
@@ -1129,7 +1129,7 @@ const VendasCarros = () => {
       <Dialog open={contratoDialogOpen} onClose={() => setContratoDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <DescriptionIcon color="success" />
-          Contrato Pronto
+          Venda Concluída!
         </DialogTitle>
         <DialogContent>
           <Typography>
@@ -1143,9 +1143,19 @@ const VendasCarros = () => {
             variant="contained"
             color="primary"
             startIcon={<VisibilityIcon />}
-            onClick={() => handleVisualizarContrato(contratoDialogVendaId)}
+            onClick={async () => {
+              try {
+                const response = await axios.get(`/api/vendas_carros/${contratoDialogVendaId}/contracts/view`, { responseType: 'blob' });
+                const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                const win = window.open(url, '_blank');
+                if (win) win.print();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+              } catch {
+                setSnackbar({ open: true, message: 'Erro ao abrir contrato para impressão.', severity: 'error' });
+              }
+            }}
           >
-            Imprimir / Visualizar
+            Imprimir Contrato
           </Button>
           <Button
             fullWidth
@@ -1153,7 +1163,7 @@ const VendasCarros = () => {
             startIcon={<DownloadIcon />}
             onClick={() => handleDownloadContratoByIdNome(contratoDialogVendaId, contratoDialogClienteNome)}
           >
-            Salvar / Baixar PDF
+            Baixar PDF
           </Button>
           <Button fullWidth onClick={() => setContratoDialogOpen(false)} color="inherit">
             Fechar

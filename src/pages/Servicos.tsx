@@ -125,10 +125,14 @@ const Servicos = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'valor' ? Number(value) : value
-    }));
+    if (name === 'valor') {
+      // Strip currency symbols, spaces, and thousand-separator dots/commas before parsing
+      const numericStr = value.replace(/[¥\s,]/g, '').replace(/\.(?=\d{3})/g, '');
+      const parsed = Number(numericStr);
+      setFormData(prev => ({ ...prev, valor: Number.isFinite(parsed) ? parsed : 0 }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async () => {
@@ -459,12 +463,14 @@ const Servicos = () => {
             margin="dense"
             name="valor"
             label={t('valor')}
-            type="number"
+            type="text"
+            inputMode="numeric"
             fullWidth
             variant="outlined"
-            value={formData.valor}
+            value={formData.valor || ''}
             onChange={handleInputChange}
             sx={{ mb: 2 }}
+            placeholder="Ex: 10000"
           />
           <TextField
             margin="dense"

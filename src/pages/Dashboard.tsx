@@ -1,8 +1,9 @@
-import { Box, Grid, Typography, Card, CardContent, CardHeader, List, ListItemButton, ListItemText, Divider } from '@mui/material';
+import { Box, Grid, Typography, Card, CardContent, CardHeader, List, ListItemButton, ListItemText, Divider, Chip } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import BuildIcon from '@mui/icons-material/Build';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -43,28 +44,43 @@ interface VendaCarro {
   parcelasStatus?: boolean[];
 }
 
+interface FinanceiroDashboard {
+  totalRecebido: number;
+  totalPendente: number;
+  proximasContas: Array<{
+    id: string;
+    clienteNome: string;
+    dataVencimento: string;
+    valor: number;
+    status: string;
+  }>;
+}
+
 const Dashboard = () => {
   const { t } = useLanguage();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([]);
   const [vendasCarros, setVendasCarros] = useState<VendaCarro[]>([]);
+  const [financeiroDashboard, setFinanceiroDashboard] = useState<FinanceiroDashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientesRes, veiculosRes, ordensRes, vendasRes] = await Promise.all([
+        const [clientesRes, veiculosRes, ordensRes, vendasRes, financeiroRes] = await Promise.all([
           axios.get('/api/clientes'),
           axios.get('/api/veiculos'),
           axios.get('/api/ordens_servico'),
-          axios.get('/api/vendas_carros')
+          axios.get('/api/vendas_carros'),
+          axios.get('/api/financeiro/dashboard/mes').catch(() => ({ data: null })),
         ]);
 
         setClientes(clientesRes.data);
         setVeiculos(veiculosRes.data);
         setOrdensServico(ordensRes.data);
         setVendasCarros(vendasRes.data);
+        if (financeiroRes.data) setFinanceiroDashboard(financeiroRes.data);
         setLoading(false);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
@@ -149,6 +165,69 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ flexGrow: 1, mt: 4 }}>
+      {/* Cards Financeiros do Mês Atual */}
+      {financeiroDashboard && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card elevation={3} sx={{ backgroundColor: '#e8f5e9', borderLeft: '4px solid #2e7d32' }}>
+              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <AttachMoneyIcon sx={{ fontSize: 38, color: '#2e7d32' }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">🟢 Recebido este Mês</Typography>
+                  <Typography variant="h5" fontWeight="bold" color="#2e7d32">
+                    {formatCurrency(financeiroDashboard.totalRecebido)}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card elevation={3} sx={{ backgroundColor: '#fff3e0', borderLeft: '4px solid #e65100' }}>
+              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <AttachMoneyIcon sx={{ fontSize: 38, color: '#e65100' }} />
+                <Box>
+                  <Typography variant="body2" color="text.secondary">🟠 A Receber este Mês</Typography>
+                  <Typography variant="h5" fontWeight="bold" color="#e65100">
+                    {formatCurrency(financeiroDashboard.totalPendente)}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          {financeiroDashboard.proximasContas.length > 0 && (
+            <Grid item xs={12} md={4}>
+              <Card elevation={3}>
+                <CardHeader
+                  title="📅 Próximas a Receber"
+                  avatar={<CalendarMonthIcon color="primary" />}
+                  titleTypographyProps={{ variant: 'subtitle1' }}
+                />
+                <CardContent sx={{ p: 0 }}>
+                  <List disablePadding dense>
+                    {financeiroDashboard.proximasContas.map((conta) => (
+                      <div key={conta.id}>
+                        <ListItemButton sx={{ px: 2, py: 0.5 }}>
+                          <ListItemText
+                            primary={conta.clienteNome || '—'}
+                            secondary={new Date(conta.dataVencimento).toLocaleDateString('pt-BR')}
+                          />
+                          <Chip
+                            label={formatCurrency(conta.valor)}
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                          />
+                        </ListItemButton>
+                        <Divider />
+                      </div>
+                    ))}
+                  </List>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+        </Grid>
+      )}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {statCards.map((card) => (
           <Grid item xs={12} sm={6} md={4} key={card.label}>
