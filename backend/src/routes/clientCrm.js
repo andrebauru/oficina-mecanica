@@ -55,10 +55,10 @@ router.get('/clients/:clientId/history', async (req, res) => {
 router.get('/clients/:clientId/interactions', async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+    if (!clientId) return res.status(400).json({ message: 'clientId é obrigatório' });
 
-    const parsedLimit = Number.parseInt(String(limit), 10);
-    const parsedOffset = Number.parseInt(String(offset), 10);
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
 
     const rows = await query(
       `SELECT
@@ -75,7 +75,7 @@ router.get('/clients/:clientId/interactions', async (req, res) => {
        WHERE client_id = ?
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
-      [clientId, Number.isNaN(parsedLimit) ? 50 : parsedLimit, Number.isNaN(parsedOffset) ? 0 : parsedOffset]
+      [clientId, limit, offset]
     );
 
     const countRows = await query(
@@ -86,8 +86,8 @@ router.get('/clients/:clientId/interactions', async (req, res) => {
     return res.json({
       data: rows || [],
       total: countRows[0]?.total || 0,
-      limit: Number.isNaN(parsedLimit) ? 50 : parsedLimit,
-      offset: Number.isNaN(parsedOffset) ? 0 : parsedOffset,
+      limit,
+      offset,
     });
   } catch (err) {
     console.error(err);
