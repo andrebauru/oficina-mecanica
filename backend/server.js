@@ -973,6 +973,7 @@ app.get('/api/financeiro/dashboard/mes', safeRoute(async (_req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 
+Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
   // Pular recursos com rotas POST customizadas
   if (resource === 'vendas_carros') return;
   if (resource === 'documentos') return;
