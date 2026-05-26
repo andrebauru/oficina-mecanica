@@ -907,6 +907,8 @@ function buildPuppeteerLaunchOptions() {
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process',
       '--font-render-hinting=medium',
     ],
   };
@@ -932,7 +934,7 @@ async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], venda, client
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
     await page.evaluateHandle('document.fonts.ready');
 
     const pdfBuffer = await page.pdf({
