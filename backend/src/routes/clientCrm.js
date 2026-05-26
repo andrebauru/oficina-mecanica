@@ -60,8 +60,7 @@ router.get('/clients/:clientId/interactions', async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
 
-    const rows = await query(
-      `SELECT
+    const sql = `SELECT
          id,
          client_id,
          interaction_text,
@@ -74,9 +73,9 @@ router.get('/clients/:clientId/interactions', async (req, res) => {
        FROM client_interactions
        WHERE client_id = ?
        ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`,
-      [clientId, limit, offset]
-    );
+       LIMIT ${limit} OFFSET ${offset}`;
+
+    const rows = await query(sql, [clientId]);
 
     const countRows = await query(
       'SELECT COUNT(*) as total FROM client_interactions WHERE client_id = ?',
