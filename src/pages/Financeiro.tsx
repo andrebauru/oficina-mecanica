@@ -11,6 +11,8 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PrintIcon from '@mui/icons-material/Print';
 import { formatCurrency } from '../utils/formatters';
 import { useLanguage } from '../components/LanguageContext';
 
@@ -41,6 +43,18 @@ interface LancamentoForm {
 interface CategoriaForm {
   nome: string;
   tipo: string;
+}
+
+interface Parcela {
+  id: string;
+  venda_id: string;
+  numero_parcela: number;
+  valor: number;
+  data_vencimento: string;
+  status: string;
+  data_pagamento: string | null;
+  cliente_nome: string;
+  cliente_telefone: string;
 }
 
 /* ─── TabPanel ─── */
@@ -88,6 +102,13 @@ const Financeiro = () => {
   const showMsg = (message: string, severity: 'success' | 'error' = 'success') =>
     setSnackbar({ open: true, message, severity });
 
+  /* ── Parcelas state ── */
+  const [parcelas, setParcelas] = useState<Parcela[]>([]);
+  const [parcelasFiltradas, setParcelasFiltradas] = useState<Parcela[]>([]);
+  const [parcelasLoading, setParcelasLoading] = useState(false);
+  const [parcelaFiltro, setParcelaFiltro] = useState('');
+  const [confirmBaixaId, setConfirmBaixaId] = useState<string | null>(null);
+
   /* ─── Fetch ─── */
   const fetchLancamentos = async () => {
     setLancLoading(true);
@@ -107,7 +128,28 @@ const Financeiro = () => {
     finally { setCatLoading(false); }
   };
 
-  useEffect(() => { fetchLancamentos(); fetchCategorias(); }, []);
+  useEffect(() => { fetchLancamentos(); fetchCategorias(); fetchParcelas(); }, []);
+
+  /* ─── Fetch Parcelas ─── */
+  const fetchParcelas = async () => {
+    setParcelasLoading(true);
+    try {
+      const { data } = await axios.get('/api/parcelas');
+      setParcelas(data);
+      setParcelasFiltradas(data);
+    } catch { /* silently fail if table doesn't exist yet */ }
+    finally { setParcelasLoading(false); }
+  };
+
+  useEffect(() => {
+    if (!parcelaFiltro) { setParcelasFiltradas(parcelas); return; }
+    const t = parcelaFiltro.toLowerCase();
+    setParcelasFiltradas(parcelas.filter(p =>
+      p.cliente_nome?.toLowerCase().includes(t) ||
+      String(p.numero_parcela).includes(t) ||
+      p.status?.toLowerCase().includes(t)
+    ));
+  }, [parcelas, parcelaFiltro]);
 
   /* ─── Filtro + Ordenação de Lançamentos ─── */
   useEffect(() => {
@@ -147,7 +189,39 @@ const Financeiro = () => {
     setCatFiltradas(categorias.filter(c => c.nome.toLowerCase().includes(t) || c.tipo.toLowerCase().includes(t)));
   }, [categorias, catFiltro]);
 
-  /* ─── CRUD Lançamentos ─── */
+  /* ─── Filtro de Categorias ─── */
+  useEffect(() => {
+    if (!catFiltro) { setCatFiltradas(categorias); return; }
+    const t = catFiltro.toLowerCase();
+    setCatFiltradas(categorias.filter(c => c.nome.toLowerCase().includes(t) || c.tipo.toLowerCase().includes(t)));
+  }, [categorias, catFiltro]);
+
+  /* ─── Parcelas: Dar Baixa ─── */
+  const handleDarBaixa = async (parcelaId: string) => {
+    try {
+      const { data } = await axios.put(`/api/financeiro/parcelas/${parcelaId}/pay`);
+      setParcelas(prev => prev.map(p => p.id === parcelaId ? { ...p, ...data } : p));
+      showMsg('Baixa registrada com sucesso!');
+    } catch {
+      showMsg('Erro ao registrar baixa', 'error');
+    } finally {
+      setConfirmBaixaId(null);
+    }
+  };
+
+  const handleImprimirRecibo = async (parcelaId: string) => {
+    try {
+      const res = await fetch(`/api/financeiro/parcelas/${parcelaId}/recibo`);
+      if (!res.ok) throw new Error('Falha ao gerar recibo');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch {
+      showMsg('Erro ao gerar recibo PDF', 'error');
+    }
+  };
+
+
   const handleOpenLancForm = (l?: Lancamento) => {
     if (l) {
       setLancForm({ data: l.data, tipo: l.tipo, categoria: l.categoria, valor: l.valor, descricao: l.descricao });
@@ -261,6 +335,7 @@ const Financeiro = () => {
         <Tabs value={tab} onChange={(_, v) => setTab(v)}>
           <Tab label="Lançamentos" />
           <Tab label="Tipos de Despesa / Categoria" />
+          <Tab label="Parcelas de Financiamento" />
         </Tabs>
       </Box>
 
@@ -469,6 +544,114 @@ const Financeiro = () => {
         <DialogActions>
           <Button onClick={() => setOpenCatDelete(false)} color="inherit">Cancelar</Button>
           <Button onClick={handleDeleteCat} color="error" variant="contained">Excluir</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ══════════ TAB 2 — PARCELAS ══════════ */}
+      <TabPanel value={tab} index={2}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+          <Typography variant="h6">Parcelas de Financiamento</Typography>
+          <TextField
+            size="small"
+            placeholder="Buscar por cliente, parcela ou status..."
+            value={parcelaFiltro}
+            onChange={e => setParcelaFiltro(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+            sx={{ minWidth: 260 }}
+          />
+        </Box>
+
+        {parcelasLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+        ) : (
+          <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
+            <Table sx={{ minWidth: 700 }}>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#1a237e' }}>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Cliente</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Parcela</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="right">Valor</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Vencimento</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Status</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Pagamento</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Ações</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {parcelasFiltradas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                        Nenhuma parcela encontrada.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : parcelasFiltradas.map(p => (
+                  <TableRow key={p.id} hover sx={{ backgroundColor: p.status === 'pago' ? '#f1f8e9' : 'inherit' }}>
+                    <TableCell>{p.cliente_nome || '—'}</TableCell>
+                    <TableCell align="center">{p.numero_parcela}</TableCell>
+                    <TableCell align="right">{formatCurrency(p.valor)}</TableCell>
+                    <TableCell align="center">
+                      {p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR') : '—'}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={p.status === 'pago' ? 'Pago' : 'Pendente'}
+                        color={p.status === 'pago' ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      {p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '—'}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        {p.status !== 'pago' && (
+                          <IconButton
+                            size="small"
+                            color="success"
+                            title="Dar Baixa"
+                            onClick={() => setConfirmBaixaId(p.id)}
+                          >
+                            <CheckCircleIcon />
+                          </IconButton>
+                        )}
+                        {p.status === 'pago' && (
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            title="Imprimir Recibo"
+                            onClick={() => handleImprimirRecibo(p.id)}
+                          >
+                            <PrintIcon />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </TabPanel>
+
+      {/* ══ Dialog — Confirmar Dar Baixa ══ */}
+      <Dialog open={!!confirmBaixaId} onClose={() => setConfirmBaixaId(null)}>
+        <DialogTitle>Confirmar Baixa</DialogTitle>
+        <DialogContent>
+          <Typography>Confirmar o pagamento desta parcela? A data de pagamento será registrada como hoje.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmBaixaId(null)} color="inherit">Cancelar</Button>
+          <Button
+            onClick={() => confirmBaixaId && handleDarBaixa(confirmBaixaId)}
+            color="success"
+            variant="contained"
+            startIcon={<CheckCircleIcon />}
+          >
+            Confirmar Baixa
+          </Button>
         </DialogActions>
       </Dialog>
 

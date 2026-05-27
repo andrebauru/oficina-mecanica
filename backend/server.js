@@ -9,6 +9,7 @@ const { testConnection, query, normalizeDatabaseError } = require('./src/config/
 const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout');
 const clientCrmRouter = require('./src/routes/clientCrm');
 const contractsRouter = require('./src/routes/contracts');
+const puppeteer = require('puppeteer');
 
 // ─── Utilitários de senha (espelho de src/utils/security.ts) ──────────────────
 function legacyHashPassword(str) {
@@ -898,6 +899,196 @@ app.post('/api/vendas_carros', safeRoute(async (req, res) => {
   const created = await getEntityById('vendas_carros', dbPayload[entityDef.idColumn]);
   return res.status(201).json(created);
 }));
+
+// ─── Baixa de parcela ────────────────────────────────────────────────────────
+app.put('/api/financeiro/parcelas/:id/pay', safeRoute(async (req, res) => {
+  const { id } = req.params;
+  try {
+    const rows = await query('SELECT * FROM parcelas WHERE id = ? LIMIT 1', [id]);
+    if (!rows.length) return res.status(404).json({ message: 'Parcela não encontrada' });
+    await query(
+      `UPDATE parcelas SET status = 'pago', data_pagamento = CURRENT_DATE() WHERE id = ?`,
+      [id]
+    );
+    const updated = await query('SELECT * FROM parcelas WHERE id = ? LIMIT 1', [id]);
+    return res.json(updated[0]);
+  } catch (err) {
+    console.error('[PUT /api/financeiro/parcelas/:id/pay]', err);
+    throw err;
+  }
+}));
+
+// ─── Recibo PDF de parcela ────────────────────────────────────────────────────
+app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
+  const { id } = req.params;
+  try {
+    const rows = await query(
+      `SELECT p.*, v.numero_parcelas AS totalParcelas, v.placa, v.chassi,
+              CONCAT(COALESCE(vc2.fabricante,''), ' ', COALESCE(vc2.modelo,'')) AS veiculoDesc
+       FROM parcelas p
+       LEFT JOIN vendas v ON p.venda_id = v.id
+       LEFT JOIN veiculos vc2 ON v.veiculo_id = vc2.id
+       WHERE p.id = ? LIMIT 1`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'Parcela não encontrada' });
+    const parcela = rows[0];
+
+    const cfgRows = await query('SELECT * FROM configuracoes LIMIT 1').catch(() => []);
+    const cfg = cfgRows[0] || {};
+
+    let logoBase64 = '';
+    try {
+      const logoPath = path.resolve(__dirname, '../src/assets/Hirata Logo.svg');
+      logoBase64 = `data:image/svg+xml;base64,${fs.readFileSync(logoPath).toString('base64')}`;
+    } catch { /* logo opcional */ }
+
+    const dataPagamento = parcela.data_pagamento
+      ? new Date(parcela.data_pagamento).toLocaleDateString('pt-BR')
+      : new Date().toLocaleDateString('pt-BR');
+    const dataVencimento = parcela.data_vencimento
+      ? new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')
+      : '—';
+    const totalParcelas = parcela.totalParcelas || '?';
+    const numeroParcela = parcela.numero_parcela || '?';
+    const valor = Number(parcela.valor || 0).toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' });
+    const veiculoDesc = (parcela.veiculoDesc || '').trim() || (parcela.placa ? `Placa: ${parcela.placa}` : 'Serviço');
+    const nomeEmpresa = cfg.nomeEmpresa || 'Hirata Cars';
+    const telefoneEmpresa = cfg.telefone || '';
+    const licenca = cfg.numeroAutorizacao || '';
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    color: #222;
+    padding: 30px 40px;
+    position: relative;
+  }
+  .watermark {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 340px; height: 340px;
+    background-image: url('${logoBase64}');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    opacity: 0.07;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .content { position: relative; z-index: 1; }
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a237e; padding-bottom: 12px; margin-bottom: 18px; }
+  .header-logo img { height: 60px; }
+  .company-info { text-align: right; }
+  .company-name { font-size: 18px; font-weight: bold; color: #1a237e; }
+  .company-sub { font-size: 11px; color: #555; margin-top: 3px; }
+  h1 { text-align: center; font-size: 20px; color: #1a237e; margin-bottom: 20px; letter-spacing: 1px; text-transform: uppercase; }
+  .info-box { background: #f5f7ff; border: 1px solid #c5cae9; border-radius: 6px; padding: 16px 20px; margin-bottom: 18px; }
+  .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #e0e0e0; }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .info-value { font-weight: 600; font-size: 13px; }
+  .valor-destaque { font-size: 22px; font-weight: bold; color: #1b5e20; text-align: center; background: #e8f5e9; border: 2px solid #a5d6a7; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+  .footer { margin-top: 40px; }
+  .assinatura-row { display: flex; gap: 40px; justify-content: center; margin-top: 30px; }
+  .assinatura-box { flex: 1; max-width: 200px; text-align: center; }
+  .assinatura-line { border-top: 1px solid #333; margin-bottom: 6px; height: 50px; }
+  .assinatura-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  .recibo-num { text-align: right; font-size: 10px; color: #888; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="watermark"></div>
+<div class="content">
+  <p class="recibo-num">Recibo Nº ${id.slice(-8).toUpperCase()}</p>
+  <div class="header">
+    <div class="header-logo">${logoBase64 ? `<img src="${logoBase64}" alt="${nomeEmpresa}" />` : ''}</div>
+    <div class="company-info">
+      <div class="company-name">${nomeEmpresa}</div>
+      ${telefoneEmpresa ? `<div class="company-sub">Tel: ${telefoneEmpresa}</div>` : ''}
+      ${licenca ? `<div class="company-sub">Lic. Nº ${licenca}</div>` : ''}
+    </div>
+  </div>
+
+  <h1>Recibo de Pagamento</h1>
+
+  <div class="info-box">
+    <div class="info-row">
+      <span class="info-label">Cliente</span>
+      <span class="info-value">${parcela.cliente_nome || '—'}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Referente a</span>
+      <span class="info-value">${veiculoDesc}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Parcela</span>
+      <span class="info-value">${numeroParcela} / ${totalParcelas}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Vencimento</span>
+      <span class="info-value">${dataVencimento}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Data de Pagamento</span>
+      <span class="info-value">${dataPagamento}</span>
+    </div>
+  </div>
+
+  <div class="valor-destaque">Valor Recebido: ${valor}</div>
+
+  <div class="footer">
+    <p style="font-size:11px; color:#666; text-align:center; margin-bottom:20px;">
+      Declaro que recebi a importância acima referente ao pagamento da parcela ${numeroParcela}/${totalParcelas}.
+    </p>
+    <div class="assinatura-row">
+      <div class="assinatura-box">
+        <div class="assinatura-line"></div>
+        <div class="assinatura-label">Carimbo / 判子 (Hanko)</div>
+      </div>
+      <div class="assinatura-box">
+        <div class="assinatura-line"></div>
+        <div class="assinatura-label">Assinatura do Responsável</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--disable-features=IsolateOrigins,site-per-process'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+      await page.evaluateHandle('document.fonts.ready');
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="recibo-parcela-${numeroParcela}.pdf"`);
+      return res.send(Buffer.from(pdfBuffer));
+    } finally {
+      await browser.close();
+    }
+  } catch (err) {
+    console.error('[GET /api/financeiro/parcelas/:id/recibo]', err);
+    throw err;
+  }
+}));
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Dashboard financeiro do mês atual ───────────────────────────────────────
 app.get('/api/financeiro/dashboard/mes', safeRoute(async (_req, res) => {
