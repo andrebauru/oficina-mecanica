@@ -669,6 +669,41 @@ ALTER TABLE `vendas_carros`
 ALTER TABLE `vendas_parcelas`
   ADD CONSTRAINT `fk_vendas_parcelas_client` FOREIGN KEY (`client_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_vendas_parcelas_contrato` FOREIGN KEY (`contrato_id`) REFERENCES `client_documents` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Estrutura da tabela `locacoes`
+--
+CREATE TABLE IF NOT EXISTS `locacoes` (
+  `id` VARCHAR(50) NOT NULL,
+  `cliente_id` VARCHAR(50) NULL,
+  `cliente_nome` VARCHAR(150) NULL,
+  `cliente_telefone` VARCHAR(40) NULL,
+  `cliente_endereco` TEXT NULL,
+  `cliente_cnh` VARCHAR(50) NULL,
+  `veiculo_id` VARCHAR(50) NULL,
+  `veiculo_marca` VARCHAR(80) NULL,
+  `veiculo_modelo` VARCHAR(80) NULL,
+  `veiculo_ano` INT NULL,
+  `veiculo_placa` VARCHAR(20) NULL,
+  `veiculo_chassi` VARCHAR(80) NULL,
+  `veiculo_km_saida` INT NULL,
+  `veiculo_km_retorno` INT NULL,
+  `data_saida` DATETIME NOT NULL,
+  `data_retorno` DATETIME NOT NULL,
+  `valor_total` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `valor_pago` DECIMAL(12,2) NULL,
+  `combustivel_saida` VARCHAR(50) NULL,
+  `combustivel_retorno` VARCHAR(50) NULL,
+  `status` VARCHAR(40) NOT NULL DEFAULT 'ativo',
+  `contrato_path` VARCHAR(255) NULL,
+  `contrato_gerado_em` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_locacoes_cliente` (`cliente_id`),
+  CONSTRAINT `fk_locacoes_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

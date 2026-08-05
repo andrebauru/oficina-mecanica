@@ -457,6 +457,77 @@ router.post('/contracts/generate', async (req, res) => {
 });
 
 /**
+ * GET /api/contracts/blank
+ * Gera e retorna inline o PDF bilíngue (JP + idioma secundário) em branco.
+ * Query params:
+ *   type: 'sale' | 'rental' (default: 'sale')
+ *   lang: 'pt' | 'vi' | 'fil' | 'ja' | 'id' | 'en' (default: 'pt')
+ *   blank: boolean
+ */
+router.get('/contracts/blank', async (req, res) => {
+  try {
+    const type = req.query.type || 'sale';
+    const lang = VALID_CONTRACT_LANGUAGES.includes(req.query.lang) ? req.query.lang : 'pt';
+
+    if (type === 'rental') {
+      const { generateRentalPdfBuffer } = require('../services/rentalPdf');
+      const pdfBuffer = await generateRentalPdfBuffer({
+        lang,
+        isBlank: true,
+        client: null,
+        veiculo: null,
+        rentalData: null,
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="contrato-locacao-em-branco.pdf"');
+      return res.send(pdfBuffer);
+    } else {
+      const pdfBuffer = await generateContractPdfBuffer({
+        idiomas: [lang],
+        isBlank: true,
+        venda: null,
+        cliente: null,
+        documento: null,
+        veiculo: null,
+        configuracao: null,
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="contrato-venda-em-branco.pdf"');
+      return res.send(pdfBuffer);
+    }
+  } catch (error) {
+    console.error('Erro ao gerar contrato em branco:', error);
+    return res.status(500).json({ message: 'Erro ao gerar contrato em branco', error: error.message });
+  }
+});
+
+/**
+ * GET /api/contracts/blank-template
+ * Gera e retorna inline o PDF bilíngue (JP+PT) em branco para impressão manual.
+ * Query param: lang (default: 'pt') — define o idioma secundário.
+ */
+router.get('/contracts/blank-template', async (req, res) => {
+  try {
+    const lang = VALID_CONTRACT_LANGUAGES.includes(req.query.lang) ? req.query.lang : 'pt';
+    const pdfBuffer = await generateContractPdfBuffer({
+      idiomas: [lang],
+      isBlank: true,
+      venda: null,
+      cliente: null,
+      documento: null,
+      veiculo: null,
+      configuracao: null,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="contrato-em-branco.pdf"');
+    return res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Erro ao gerar contrato em branco:', error);
+    return res.status(500).json({ message: 'Erro ao gerar contrato em branco', error: error.message });
+  }
+});
+
+/**
  * GET /api/contracts/:contractId
  * Recupera informações de um contrato gerado
  */

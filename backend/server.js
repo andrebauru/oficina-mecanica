@@ -10,6 +10,9 @@ const { sessionTimeout, ONE_HOUR_MS } = require('./src/middleware/sessionTimeout
 const clientCrmRouter = require('./src/routes/clientCrm');
 const contractsRouter = require('./src/routes/contracts');
 const puppeteer = require('puppeteer');
+// Carrega o SendGrid de forma segura — se o pacote ainda não estiver instalado, o site continua funcionando
+let sgMail = null;
+try { sgMail = require('@sendgrid/mail'); } catch { /* sendgrid opcional */ }
 
 // ─── Utilitários de senha (espelho de src/utils/security.ts) ──────────────────
 function legacyHashPassword(str) {
@@ -665,7 +668,7 @@ app.post('/api/auth/login', safeRoute(async (req, res) => {
   }
 
   const rows = await query(
-    'SELECT id, nome, email, idioma, senhaHash FROM usuarios WHERE nome = ? OR email = ? LIMIT 1',
+    'SELECT id, nome, email, idioma, cargo, senhaHash FROM usuarios WHERE nome = ? OR email = ? LIMIT 1',
     [loginIdentifier, loginIdentifier]
   );
   const user = rows[0];
@@ -687,6 +690,7 @@ app.post('/api/auth/login', safeRoute(async (req, res) => {
     nome: user.nome,
     email: user.email,
     idioma: user.idioma,
+    cargo: user.cargo,
   };
   req.session.lastActivity = Date.now();
 
@@ -708,10 +712,10 @@ app.post('/api/auth/setup', safeRoute(async (req, res) => {
   const senhaHash = `sha256:${salt}:${digest}`;
   const newId = `usr${Date.now()}${Math.floor(Math.random() * 1000)}`;
   await query(
-    'INSERT INTO usuarios (id, nome, email, idioma, senhaHash) VALUES (?, ?, ?, ?, ?)',
-    [newId, nome.trim(), '', 'pt', senhaHash]
+    'INSERT INTO usuarios (id, nome, email, idioma, cargo, senhaHash) VALUES (?, ?, ?, ?, ?, ?)',
+    [newId, nome.trim(), '', 'pt', 'admin', senhaHash]
   );
-  req.session.user = { id: newId, nome: nome.trim(), email: '', idioma: 'pt' };
+  req.session.user = { id: newId, nome: nome.trim(), email: '', idioma: 'pt', cargo: 'admin' };
   req.session.lastActivity = Date.now();
   return res.status(201).json({ authenticated: true, user: req.session.user, expiresInMs: ONE_HOUR_MS });
 }));
@@ -1164,6 +1168,417 @@ app.get('/api/financeiro/dashboard/mes', safeRoute(async (_req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 
+// =============================================================================
+// AUTO-MIGRATION: garante que as colunas de email/sendgrid existem em 'configuracoes'
+// Roda uma vez na inicialização sem recriar o schema do zero (seguro)
+async function garantirColunasEmailNaConfiguracao() {
+  const colunas = [
+    { coluna: 'sendgrid_api_key', tipo: 'TEXT NULL' },
+    { coluna: 'sendgrid_email_remetente', tipo: 'VARCHAR(255) NULL' },
+  ];
+  for (const { coluna, tipo } of colunas) {
+    try {
+      await query(`ALTER TABLE configuracoes ADD COLUMN IF NOT EXISTS ${coluna} ${tipo}`);
+    } catch {
+      // MySQL < 8 não suporta IF NOT EXISTS — tenta sem e ignora erro de coluna duplicada
+      try {
+        await query(`ALTER TABLE configuracoes ADD COLUMN ${coluna} ${tipo}`);
+      } catch { /* coluna já existe, tudo bem */ }
+    }
+  }
+}
+
+// =============================================================================
+// TRADUÇÕES SIMPLES PARA O EMAIL SEMANAL (espelho mínimo do i18n do frontend)
+// Cobre os 4 idiomas da GUI: pt, fil, vi, ja
+function traduzirEmailSemanal(idioma) {
+  const mapa = {
+    pt: {
+      assunto: 'Hirata Cars — Contas a Receber desta Semana',
+      titulo: 'Contas a Receber',
+      subtitulo: 'Resumo semanal de parcelas pendentes',
+      colCliente: 'Cliente',
+      colParcela: 'Parcela',
+      colValor: 'Valor',
+      colVencimento: 'Vencimento',
+      totalLabel: 'Total a Receber',
+      semContas: 'Nenhuma conta a receber esta semana. 🎉',
+      rodape: 'Sistema Hirata Cars Shop — gerado automaticamente todo domingo.',
+    },
+    fil: {
+      assunto: 'Hirata Cars — Mga Dapat Bayaran ngayong Linggo',
+      titulo: 'Mga Dapat Bayaran',
+      subtitulo: 'Lingguhang buod ng mga naaabotang bayad',
+      colCliente: 'Kliyente',
+      colParcela: 'Hulog',
+      colValor: 'Halaga',
+      colVencimento: 'Takdang Araw',
+      totalLabel: 'Kabuuang Dapat Bayaran',
+      semContas: 'Walang dapat bayaran ngayong linggo. 🎉',
+      rodape: 'Sistema Hirata Cars Shop — awtomatikong nabubuo tuwing Linggo.',
+    },
+    vi: {
+      assunto: 'Hirata Cars — Các Khoản Phải Thu Tuần Này',
+      titulo: 'Các Khoản Phải Thu',
+      subtitulo: 'Báo cáo hàng tuần về các khoản đáo hạn',
+      colCliente: 'Khách hàng',
+      colParcela: 'Khoản',
+      colValor: 'Giá trị',
+      colVencimento: 'Ngày Đáo Hạn',
+      totalLabel: 'Tổng Phải Thu',
+      semContas: 'Không có khoản phải thu tuần này. 🎉',
+      rodape: 'Hệ thống Hirata Cars Shop — tự động tạo mỗi Chủ nhật.',
+    },
+    ja: {
+      assunto: 'Hirata Cars — 今週の未収金',
+      titulo: '未収金一覧',
+      subtitulo: '今週の支払期日が来ている分割払いの一覧',
+      colCliente: 'お客様',
+      colParcela: '支払回数',
+      colValor: '金額',
+      colVencimento: '支払期日',
+      totalLabel: '合計未収金',
+      semContas: '今週は支払期日の未収金はありません。🎉',
+      rodape: 'Hirata Cars Shop システム — 毎週日曜日に自動生成。',
+    },
+  };
+  return mapa[idioma] || mapa.pt;
+}
+
+// Monta o HTML do email semanal no idioma do admin
+function montarHtmlEmailSemanal(parcelas, idioma, nomeEmpresa) {
+  const tx = traduzirEmailSemanal(idioma);
+  const formatJpy = (v) => Number(v || 0).toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' });
+  const total = parcelas.reduce((acc, p) => acc + Number(p.valor || 0), 0);
+
+  const linhas = parcelas.length === 0
+    ? `<tr><td colspan="4" style="text-align:center;padding:20px;color:#555">${tx.semContas}</td></tr>`
+    : parcelas.map(p => {
+        const venc = p.data_vencimento
+          ? new Date(p.data_vencimento).toLocaleDateString('ja-JP')
+          : '—';
+        return `
+          <tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee">${p.cliente_nome || '—'}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${p.numero_parcela || '—'}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${formatJpy(p.valor)}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${venc}</td>
+          </tr>`;
+      }).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html lang="${idioma}">
+    <head><meta charset="UTF-8"/></head>
+    <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:30px 0">
+        <tr><td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+            <!-- Cabeçalho azul da empresa -->
+            <tr><td style="background:#1a237e;padding:24px 32px;text-align:center">
+              <p style="margin:0;color:#fff;font-size:22px;font-weight:bold">${nomeEmpresa || 'Hirata Cars Shop'}</p>
+              <p style="margin:6px 0 0;color:#c5cae9;font-size:13px">${tx.subtitulo}</p>
+            </td></tr>
+            <!-- Título da seção -->
+            <tr><td style="padding:20px 32px 0">
+              <h2 style="margin:0;font-size:18px;color:#1a237e">${tx.titulo}</h2>
+            </td></tr>
+            <!-- Tabela de parcelas -->
+            <tr><td style="padding:12px 32px 0">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px">
+                <thead>
+                  <tr style="background:#e8eaf6">
+                    <th style="padding:8px 12px;text-align:left;color:#3949ab">${tx.colCliente}</th>
+                    <th style="padding:8px 12px;text-align:center;color:#3949ab">${tx.colParcela}</th>
+                    <th style="padding:8px 12px;text-align:right;color:#3949ab">${tx.colValor}</th>
+                    <th style="padding:8px 12px;text-align:center;color:#3949ab">${tx.colVencimento}</th>
+                  </tr>
+                </thead>
+                <tbody>${linhas}</tbody>
+              </table>
+            </td></tr>
+            <!-- Total -->
+            ${parcelas.length > 0 ? `
+            <tr><td style="padding:16px 32px">
+              <table width="100%"><tr>
+                <td style="font-weight:bold;color:#333;font-size:14px">${tx.totalLabel}:</td>
+                <td style="text-align:right;font-weight:bold;font-size:16px;color:#1b5e20">${formatJpy(total)}</td>
+              </tr></table>
+            </td></tr>` : ''}
+            <!-- Rodapé -->
+            <tr><td style="background:#f5f5f5;padding:16px 32px;text-align:center">
+              <p style="margin:0;font-size:11px;color:#999">${tx.rodape}</p>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </body></html>`;
+}
+
+// Alarme de domingo: todo final de semana avisa o chefe o que tem pra receber
+async function dispararEmailSemanalContasAReceber() {
+  try {
+    // Busca configuração do SendGrid no banco
+    const cfgRows = await query('SELECT * FROM configuracoes LIMIT 1').catch(() => []);
+    const cfg = cfgRows[0] || {};
+    const apiKey = (cfg.sendgrid_api_key || '').trim();
+    const emailRemetente = (cfg.sendgrid_email_remetente || '').trim();
+
+    // Se chave em branco = serviço desligado silenciosamente
+    if (!apiKey || !sgMail) {
+      console.log('[EmailSemanal] SendGrid não configurado — serviço desativado.');
+      return;
+    }
+
+    sgMail.setApiKey(apiKey);
+
+    // Busca todos os admins com email preenchido
+    const admins = await query(
+      `SELECT nome, email, idioma FROM usuarios WHERE cargo = 'admin' AND email IS NOT NULL AND email != ''`
+    ).catch(() => []);
+
+    if (!admins.length) {
+      console.log('[EmailSemanal] Nenhum admin com email cadastrado.');
+      return;
+    }
+
+    // Busca parcelas pendentes da semana corrente (próximos 7 dias)
+    const [parcelasPendentes, vendasParcelasPendentes] = await Promise.all([
+      query(
+        `SELECT p.id, p.cliente_nome, p.numero_parcela, p.valor, p.data_vencimento
+         FROM parcelas p
+         WHERE p.status != 'pago'
+         AND p.data_vencimento BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)
+         ORDER BY p.data_vencimento ASC`
+      ).catch(() => []),
+      query(
+        `SELECT vp.id, c.nome AS cliente_nome, vp.numero_parcela, vp.valor, vp.data_vencimento
+         FROM vendas_parcelas vp
+         JOIN clientes c ON vp.client_id = c.id
+         WHERE vp.status != 'pago'
+         AND vp.data_vencimento BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)
+         ORDER BY vp.data_vencimento ASC`
+      ).catch(() => []),
+    ]);
+
+    const todasParcelas = [...parcelasPendentes, ...vendasParcelasPendentes]
+      .sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
+
+    const nomeEmpresa = cfg.nomeEmpresa || 'Hirata Cars Shop';
+
+    // Envia email para cada admin no seu próprio idioma
+    for (const admin of admins) {
+      const idioma = admin.idioma || 'pt';
+      const tx = traduzirEmailSemanal(idioma);
+      const htmlBody = montarHtmlEmailSemanal(todasParcelas, idioma, nomeEmpresa);
+
+      try {
+        await sgMail.send({
+          to: admin.email,
+          from: emailRemetente,
+          subject: tx.assunto,
+          html: htmlBody,
+        });
+        console.log(`[EmailSemanal] Enviado para ${admin.email} (idioma: ${idioma}).`);
+      } catch (mailErr) {
+        console.error(`[EmailSemanal] Erro ao enviar para ${admin.email}:`, mailErr.message);
+      }
+    }
+  } catch (err) {
+    console.error('[EmailSemanal] Erro geral no envio do email semanal:', err.message);
+  }
+}
+
+// Calcula quantos ms faltam até o próximo domingo às 08:00 (horário do servidor)
+function msPapaProximoDomingoOito() {
+  const agora = new Date();
+  const diaSemana = agora.getDay(); // 0=dom, 1=seg...
+  const diasParaDomingo = diaSemana === 0 ? 0 : 7 - diaSemana;
+  const proximoDomingo = new Date(agora);
+  proximoDomingo.setDate(agora.getDate() + diasParaDomingo);
+  proximoDomingo.setHours(8, 0, 0, 0);
+  // Se já passou das 08h do domingo atual, pula para o próximo
+  if (proximoDomingo <= agora) proximoDomingo.setDate(proximoDomingo.getDate() + 7);
+  return proximoDomingo.getTime() - agora.getTime();
+}
+
+// Ativa o alarme do domingo quando o servidor inicializar
+function ativarCronEmailDomingo() {
+  const msParaPrimeiro = msPapaProximoDomingoOito();
+  console.log(`[EmailSemanal] Próximo envio em ${Math.round(msParaPrimeiro / 1000 / 60)} minutos.`);
+  setTimeout(async () => {
+    await dispararEmailSemanalContasAReceber();
+    // Após o primeiro envio, repete a cada 7 dias exatos
+    setInterval(dispararEmailSemanalContasAReceber, 7 * 24 * 60 * 60 * 1000);
+  }, msParaPrimeiro);
+}
+
+// =============================================================================
+// ROTA: GET /api/calendario/vencimentos?ano=YYYY&mes=MM
+// Retorna vencimentos do mês agrupados por dia para preencher o calendário
+app.get('/api/calendario/vencimentos', safeRoute(async (req, res) => {
+  const ano = parseInt(req.query.ano) || new Date().getFullYear();
+  const mes = parseInt(req.query.mes) || (new Date().getMonth() + 1);
+
+  // Consulta parcelas (vinculadas a vendas de gestão)
+  const parcelasMes = await query(
+    `SELECT p.id, p.cliente_nome, p.numero_parcela, p.valor, p.data_vencimento, p.status,
+            'parcelas' AS origem
+     FROM parcelas p
+     WHERE YEAR(p.data_vencimento) = ? AND MONTH(p.data_vencimento) = ?
+     ORDER BY p.data_vencimento ASC`,
+    [ano, mes]
+  ).catch(() => []);
+
+  // Consulta vendas_parcelas (vinculadas a contratos de clientes)
+  const vendasParcelasMes = await query(
+    `SELECT vp.id, c.nome AS cliente_nome, vp.numero_parcela, vp.valor, vp.data_vencimento, vp.status,
+            'vendas_parcelas' AS origem
+     FROM vendas_parcelas vp
+     JOIN clientes c ON vp.client_id = c.id
+     WHERE YEAR(vp.data_vencimento) = ? AND MONTH(vp.data_vencimento) = ?
+     ORDER BY vp.data_vencimento ASC`,
+    [ano, mes]
+  ).catch(() => []);
+
+  // Agrupa tudo por dia do mês
+  const agrupado = {};
+  for (const item of [...parcelasMes, ...vendasParcelasMes]) {
+    const dia = new Date(item.data_vencimento).getDate();
+    if (!agrupado[dia]) agrupado[dia] = [];
+    agrupado[dia].push({
+      id: item.id,
+      clienteNome: item.cliente_nome || '—',
+      numeroParcela: item.numero_parcela,
+      valor: Number(item.valor || 0),
+      dataVencimento: item.data_vencimento,
+      status: item.status || 'pendente',
+      origem: item.origem,
+    });
+  }
+
+  return res.json({ ano, mes, vencimentos: agrupado });
+}));
+
+// =============================================================================
+// ROTA: PUT /api/calendario/parcelas/:id/baixa?origem=parcelas|vendas_parcelas
+// Marca a parcela como paga — funciona para ambas as tabelas
+app.put('/api/calendario/parcelas/:id/baixa', safeRoute(async (req, res) => {
+  const { id } = req.params;
+  const origem = req.query.origem === 'vendas_parcelas' ? 'vendas_parcelas' : 'parcelas';
+
+  const rows = await query(`SELECT id FROM ${origem} WHERE id = ? LIMIT 1`, [id]);
+  if (!rows.length) return res.status(404).json({ message: 'Parcela não encontrada' });
+
+  await query(
+    `UPDATE ${origem} SET status = 'pago', data_pagamento = CURRENT_DATE() WHERE id = ?`,
+    [id]
+  );
+
+  const updated = await query(`SELECT * FROM ${origem} WHERE id = ? LIMIT 1`, [id]);
+  return res.json({ ok: true, parcela: updated[0] });
+}));
+
+// =============================================================================
+// ROTA: PUT /api/calendario/parcelas/:id/remarcar?origem=parcelas|vendas_parcelas
+// Altera a data de vencimento de uma parcela específica (pedido do cliente)
+app.put('/api/calendario/parcelas/:id/remarcar', safeRoute(async (req, res) => {
+  const { id } = req.params;
+  const origem = req.query.origem === 'vendas_parcelas' ? 'vendas_parcelas' : 'parcelas';
+  const { novaData } = req.body || {};
+
+  if (!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData)) {
+    return res.status(400).json({ message: 'novaData inválida. Use o formato YYYY-MM-DD.' });
+  }
+
+  const rows = await query(`SELECT id FROM ${origem} WHERE id = ? LIMIT 1`, [id]);
+  if (!rows.length) return res.status(404).json({ message: 'Parcela não encontrada' });
+
+  await query(`UPDATE ${origem} SET data_vencimento = ? WHERE id = ?`, [novaData, id]);
+
+  const updated = await query(`SELECT * FROM ${origem} WHERE id = ? LIMIT 1`, [id]);
+  return res.json({ ok: true, parcela: updated[0] });
+}));
+
+// =============================================================================
+// ROTA: GET /api/sendgrid/config — lê configuração SendGrid (somente admin)
+app.get('/api/sendgrid/config', safeRoute(async (req, res) => {
+  const cfgRows = await query('SELECT sendgrid_api_key, sendgrid_email_remetente FROM configuracoes LIMIT 1').catch(() => []);
+  const cfg = cfgRows[0] || {};
+  // Retorna a chave mascarada (só os primeiros 8 chars) por segurança
+  const apiKeyPreview = (cfg.sendgrid_api_key || '').length > 8
+    ? cfg.sendgrid_api_key.slice(0, 8) + '••••••••••••••••••••'
+    : '';
+  return res.json({
+    apiKeyConfigurada: !!(cfg.sendgrid_api_key || '').trim(),
+    apiKeyPreview,
+    emailRemetente: cfg.sendgrid_email_remetente || '',
+  });
+}));
+
+// =============================================================================
+// ROTA: PUT /api/sendgrid/config — salva configuração SendGrid (somente admin)
+app.put('/api/sendgrid/config', safeRoute(async (req, res) => {
+  const { apiKey, emailRemetente } = req.body || {};
+  const cfgRows = await query('SELECT id FROM configuracoes LIMIT 1').catch(() => []);
+  if (!cfgRows.length) {
+    return res.status(404).json({ message: 'Configuração não encontrada' });
+  }
+  await query(
+    'UPDATE configuracoes SET sendgrid_api_key = ?, sendgrid_email_remetente = ? WHERE id = ?',
+    [apiKey || '', emailRemetente || '', cfgRows[0].id]
+  );
+  return res.json({ ok: true });
+}));
+
+// =============================================================================
+// ROTA: POST /api/sendgrid/testar-chave — dispara um email de teste
+// Usado pelo admin para verificar se a API Key está funcionando
+app.post('/api/sendgrid/testar-chave', safeRoute(async (req, res) => {
+  const { apiKey, emailDestino, idioma } = req.body || {};
+  let keyParaUsar = (apiKey || '').trim();
+
+  if (!emailDestino) {
+    return res.status(400).json({ ok: false, error: 'emailDestino é obrigatório' });
+  }
+
+  // Se não foi informada chave, ou se é a chave mascarada de visualização (contém bolinhas), pega do banco
+  if (!keyParaUsar || keyParaUsar.includes('••')) {
+    const cfgRows = await query('SELECT sendgrid_api_key FROM configuracoes LIMIT 1').catch(() => []);
+    const cfg = cfgRows[0] || {};
+    keyParaUsar = (cfg.sendgrid_api_key || '').trim();
+  }
+
+  if (!keyParaUsar) {
+    return res.status(400).json({ ok: false, error: 'Chave API do SendGrid não configurada nem informada.' });
+  }
+
+  if (!sgMail) {
+    return res.status(503).json({ ok: false, error: 'Pacote @sendgrid/mail não está instalado no servidor.' });
+  }
+
+  try {
+    sgMail.setApiKey(keyParaUsar);
+    const tx = traduzirEmailSemanal(idioma || 'pt');
+    const cfgRows = await query('SELECT nomeEmpresa, sendgrid_email_remetente FROM configuracoes LIMIT 1').catch(() => []);
+    const cfg = cfgRows[0] || {};
+    const remetente = cfg.sendgrid_email_remetente || emailDestino;
+    const nomeEmpresa = cfg.nomeEmpresa || 'Hirata Cars Shop';
+
+    await sgMail.send({
+      to: emailDestino,
+      from: remetente,
+      subject: `[TESTE] ${tx.assunto}`,
+      html: montarHtmlEmailSemanal([], idioma || 'pt', nomeEmpresa),
+    });
+    return res.json({ ok: true });
+  } catch (err) {
+    const detalhe = err?.response?.body?.errors?.[0]?.message || err.message;
+    return res.status(400).json({ ok: false, error: detalhe });
+  }
+}));
+
+// =============================================================================
 Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
   // Pular recursos com rotas POST customizadas
   if (resource === 'vendas_carros') return;
@@ -1200,7 +1615,12 @@ app.listen(env.apiPort, async () => {
   try {
     await testConnection();
     console.log(`Backend MySQL ativo na porta ${env.apiPort}`);
+    // Garante que as colunas de SendGrid existam na tabela de configurações
+    await garantirColunasEmailNaConfiguracao().catch((e) => console.warn('[AutoMigration] Aviso:', e.message));
+    // Ativa o alarme do domingo para emails semanais de contas a receber
+    ativarCronEmailDomingo();
   } catch (error) {
     console.error('Falha ao conectar no MySQL:', error.message);
   }
 });
+
