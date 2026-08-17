@@ -1,3 +1,13 @@
+// ─── DOTENV: deve ser a primeira instrução do processo ────────────────────────
+// Carregado aqui (antes de qualquer require) para garantir que process.env
+// esteja populado quando os módulos filhos (database.js, env.js) forem avaliados.
+// override:true sobrescreve variáveis que o PM2/shell possa ter injetado em branco.
+require('dotenv').config({
+  path: require('path').resolve(__dirname, '.env'),
+  override: true,
+});
+// ──────────────────────────────────────────────────────────────────────────────
+
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
