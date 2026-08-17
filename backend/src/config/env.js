@@ -1,7 +1,6 @@
 const path = require('path');
-const dotenv = require('dotenv');
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// NOTA: dotenv já foi carregado com override:true no topo de server.js.
+// Não recarregar aqui para não sobrescrever process.env com valores de um .env diferente.
 
 function required(name, fallback) {
   const value = process.env[name] ?? fallback;
@@ -15,11 +14,11 @@ const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   apiPort: Number(process.env.API_PORT || 3001),
   db: {
-    host: required('DB_HOST', '127.0.0.1'),
-    port: Number(required('DB_PORT', '3306')),
-    user: required('DB_USER', 'root'),
-    password: process.env.DB_PASSWORD || '',
-    database: required('DB_NAME', 'hirata_cars'),
+    host: required('DB_HOST'),
+    port: Number(process.env.DB_PORT) || 3306,
+    user: required('DB_USER'),
+    password: required('DB_PASSWORD'),
+    database: required('DB_NAME'),
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
