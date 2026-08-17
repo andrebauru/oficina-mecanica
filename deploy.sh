@@ -41,12 +41,12 @@ echo "Garantindo permissão de execução do deploy..."
 chmod +x deploy.sh
 
 echo "Reiniciando PM2..."
-# Usa ecosystem.config.js como fonte canônica de configuração.
+# Usa ecosystem.config.cjs como fonte canônica de configuração.
 # 'reload' garante zero-downtime; fallback para 'start' se o processo ainda nao existir.
 if pm2 describe hirata-backend > /dev/null 2>&1; then
-    pm2 reload ecosystem.config.js --env production
+    pm2 reload ecosystem.config.cjs --env production
 else
-    pm2 start ecosystem.config.js --env production
+    pm2 start ecosystem.config.cjs --env production
 fi
 pm2 save
 
