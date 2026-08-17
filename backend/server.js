@@ -1592,6 +1592,23 @@ registerEntityRoutes('vendas_carros', ENTITY_ROUTES.vendas_carros);
 // Registrar rotas genéricas para documentos (GET list, GET/:id, PUT, PATCH, DELETE), POST já está customizado
 registerEntityRoutes('documentos', ENTITY_ROUTES.documentos);
 
+// ─── Servir Frontend React (dist) ─────────────────────────────────────────────
+// O build do Vite gera os arquivos em <raiz>/dist. Em produção, o backend
+// serve esses arquivos estáticos e redireciona qualquer rota desconhecida
+// para o index.html, garantindo que o React Router funcione corretamente.
+const DIST_PATH = path.resolve(__dirname, '..', 'dist');
+if (fs.existsSync(DIST_PATH)) {
+  app.use(express.static(DIST_PATH));
+  // Fallback SPA — deve vir DEPOIS de todas as rotas de API
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(DIST_PATH, 'index.html'));
+  });
+  console.log(`[Static] Servindo frontend em: ${DIST_PATH}`);
+} else {
+  console.warn(`[Static] Pasta dist não encontrada em: ${DIST_PATH}. Rode "npm run build" na raiz do projeto.`);
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 app.use((error, _req, res, _next) => {
   const normalized = normalizeDatabaseError(error);
   const statusCode = normalized.statusCode || 500;
