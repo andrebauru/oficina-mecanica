@@ -758,6 +758,7 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
     }).format(Number(v || 0));
 
   const fmtDate = (d) => {
+    if (!d) return '—';
     const dt = d instanceof Date ? d : new Date(d);
     if (isNaN(dt.getTime())) return '—';
     return dt.toLocaleDateString('pt-BR');
@@ -765,47 +766,55 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
 
   const rows = parcelas
     .map(
-      (p, i) => `
+      (p, i) => {
+        const num = p.numero || (i + 1);
+        const venc = p.data_vencimento || p.data || p.datavencimento;
+        return `
         <tr style="${i % 2 === 0 ? 'background:#f8fafc;' : 'background:#fff;'}">
-          <td style="padding:6px 8px; text-align:center; font-weight:700;">${p.numero}</td>
-          <td style="padding:6px 8px; text-align:center;">${fmtDate(p.data_vencimento)}</td>
-          <td style="padding:6px 8px; text-align:right; font-weight:600;">${currency(p.valor)}</td>
-          <td style="padding:6px 8px; text-align:center;">
+          <td style="padding:7px 10px; text-align:center; font-weight:700; border:1px solid #cbd5e1;">${num}</td>
+          <td style="padding:7px 10px; text-align:center; border:1px solid #cbd5e1;">${fmtDate(venc)}</td>
+          <td style="padding:7px 10px; text-align:right; font-weight:700; border:1px solid #cbd5e1;">${currency(p.valor)}</td>
+          <td style="padding:7px 10px; text-align:center; border:1px solid #cbd5e1;">
             <span style="
               display:inline-block;
-              width:14px; height:14px;
+              width:15px; height:15px;
               border:2px solid #374151;
-              border-radius:2px;
+              border-radius:3px;
               vertical-align:middle;
-              margin-right:5px;
+              margin-right:6px;
             "></span>
-            Pago
+            <span style="font-size:11px; font-weight:600;">[ &nbsp; ] Pago / 支払済</span>
           </td>
-          <td style="padding:6px 8px;"></td>
-        </tr>`
+          <td style="padding:7px 10px; border:1px solid #cbd5e1; height:32px;"></td>
+        </tr>`;
+      }
     )
     .join('');
 
   return `
     <div style="
       page-break-before: always;
-      font-family: 'Noto Sans JP', sans-serif;
+      break-before: page;
+      font-family: 'Noto Sans JP', 'Helvetica Neue', Arial, sans-serif;
       font-size: 11px;
       color: #111;
-      padding: 0;
+      padding: 10px 0;
+      width: 100%;
     ">
       <!-- Cabeçalho do Carnê -->
       <div style="
         text-align: center;
         border-bottom: 3px solid #1e293b;
-        padding-bottom: 8px;
-        margin-bottom: 14px;
+        padding-bottom: 10px;
+        margin-bottom: 16px;
       ">
-        <p style="margin:0; font-size:16px; font-weight:700;">分割払い手帳 / Carnê de Parcelas</p>
+        <h2 style="margin:0 0 4px; font-size:18px; font-weight:800; color:#1e293b; letter-spacing:0.5px;">
+          分割払い手帳 / CARNÊ DE PARCELAS
+        </h2>
         <p style="margin:4px 0 0; font-size:11px; color:#374151;">
-          Cliente: <strong>${escapeHtml(clienteNome || '—')}</strong>
-          &nbsp;|&nbsp;
-          Veículo: <strong>${escapeHtml(veiculoInfo || '—')}</strong>
+          Cliente / 買主: <strong>${escapeHtml(clienteNome || '—')}</strong>
+          &nbsp;&nbsp;|&nbsp;&nbsp;
+          Veículo / 車両: <strong>${escapeHtml(veiculoInfo || '—')}</strong>
         </p>
       </div>
 
@@ -819,11 +828,11 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
       ">
         <thead>
           <tr style="background:#1e293b; color:#fff;">
-            <th style="padding:7px 8px; text-align:center; font-size:11px;">Nº</th>
-            <th style="padding:7px 8px; text-align:center; font-size:11px;">Vencimento / 支払期日</th>
-            <th style="padding:7px 8px; text-align:right;  font-size:11px;">Valor / 金額</th>
-            <th style="padding:7px 8px; text-align:center; font-size:11px;">Situação / 状況</th>
-            <th style="padding:7px 8px; text-align:left;   font-size:11px;">Assinatura / 署名</th>
+            <th style="padding:8px 10px; text-align:center; font-size:11px; width:45px; border:1px solid #334155;">Nº</th>
+            <th style="padding:8px 10px; text-align:center; font-size:11px; border:1px solid #334155;">Vencimento / 支払期日</th>
+            <th style="padding:8px 10px; text-align:right;  font-size:11px; border:1px solid #334155;">Valor / 金額</th>
+            <th style="padding:8px 10px; text-align:center; font-size:11px; border:1px solid #334155;">Situação / 状況</th>
+            <th style="padding:8px 10px; text-align:left;   font-size:11px; width:150px; border:1px solid #334155;">Assinatura / 署名・印</th>
           </tr>
         </thead>
         <tbody>
@@ -832,10 +841,13 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
       </table>
 
       <!-- Rodapé do Carnê -->
-      <p style="margin-top:14px; font-size:9px; color:#6b7280; text-align:center;">
-        Este carnê é um documento auxiliar. O contrato de compra e venda prevalece em caso de divergência.
-        / このカルネは補助書類です。相違がある場合は売買契約書が優先されます。
-      </p>
+      <div style="margin-top:20px; padding:10px; background:#f1f5f9; border-radius:4px; border:1px solid #e2e8f0; text-align:center;">
+        <p style="margin:0; font-size:10px; color:#475569; line-height:1.4;">
+          Este carnê é um documento auxiliar de controle financeiro. O contrato de compra e venda prevalece em caso de divergência.
+          <br/>
+          このカルネは支払管理のための補助書類です。相違がある場合は売買契約書が優先されます。
+        </p>
+      </div>
     </div>
   `;
 }
@@ -887,8 +899,20 @@ async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], isBlank = fal
   const contractHtml = buildContractHtml({ idiomas, payload, isBlank });
   const clienteNome   = cliente?.nome || venda?.cliente_nome || '';
   const veiculoInfo   = `${venda?.fabricante || veiculo?.marca || ''} ${venda?.modelo || veiculo?.modelo || ''} ${venda?.ano || veiculo?.ano || ''}`.trim();
-  const carneBloco    = (!isBlank && Array.isArray(parcelasParaCarne) && parcelasParaCarne.length > 0)
-    ? buildCarneHtml(parcelasParaCarne, clienteNome, veiculoInfo)
+  
+  // Se parcelasParaCarne não foi passado diretamente, usar as parcelas calculadas em payload.pagamento.installments
+  const parcelasArray = (Array.isArray(parcelasParaCarne) && parcelasParaCarne.length > 0)
+    ? parcelasParaCarne
+    : (payload.pagamento && Array.isArray(payload.pagamento.installments) && payload.pagamento.installments.length > 1)
+      ? payload.pagamento.installments.map((inst, idx) => ({
+          numero: inst.numero || (idx + 1),
+          data_vencimento: inst.data,
+          valor: inst.valor,
+        }))
+      : [];
+
+  const carneBloco = (!isBlank && parcelasArray.length > 0)
+    ? buildCarneHtml(parcelasArray, clienteNome, veiculoInfo)
     : '';
 
   // Injeta o bloco do carnê imediatamente antes de </body>
@@ -935,3 +959,4 @@ async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], isBlank = fal
 module.exports = {
   generateContractPdfBuffer,
 };
+

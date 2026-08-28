@@ -153,10 +153,6 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     const { vendaId } = req.params;
     const { idiomas, invalid } = normalizeContractLanguages(req.body);
 
-    // Campos opcionais do carnê de parcelas
-    const quantidadeParcelas = parseInt(req.body.quantidadeParcelas || 0, 10);
-    const dataPrimeiraParcela = req.body.dataPrimeiraParcela || null; // 'YYYY-MM-DD'
-
     if (invalid.length > 0) {
       return res.status(400).json({
         message: `Idioma inválido. Use apenas: ${VALID_CONTRACT_LANGUAGES.join(', ')}.`,
@@ -169,6 +165,14 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       return res.status(404).json({ message: 'Venda não encontrada' });
     }
     const venda = vendaRows[0];
+
+    // Campos do carnê de parcelas (body ou fallback para a venda existente)
+    const quantidadeParcelas = parseInt(req.body.quantidadeParcelas ?? venda.parcelas ?? 1, 10);
+    const dataPrimeiraParcela = req.body.dataPrimeiraParcela || (() => {
+      const d = new Date();
+      d.setMonth(d.getMonth() + 1);
+      return d.toISOString().split('T')[0];
+    })();
 
     const clienteRows = venda.clienteId
       ? await query('SELECT * FROM clientes WHERE id = ? LIMIT 1', [venda.clienteId])
@@ -190,13 +194,38 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     const configRows = await query('SELECT * FROM configuracoes ORDER BY id DESC LIMIT 1');
     const configuracao = configRows[0] || null;
 
-    // ─── Calcular e persistir parcelas (se solicitado) ───────────────────────
+    const valorTotal = Number(venda.valor_total || venda.valor || 0);
+    const valorSinal = Number(venda.valor_pago || 0);
+    const valorFinanciado = Math.max(0, valorTotal - valorSinal);
+
+    // ─── Regime de Caixa: Inserir no financeiro APENAS o sinal/entrada da venda ───
+    if (valorSinal > 0) {
+      try {
+        const hoje = new Date().toISOString().split('T')[0];
+        const financId = uuidv4();
+        const descSinal = `Entrada/Sinal da venda: ${venda.fabricante || ''} ${venda.modelo || ''}`.trim() +
+          (cliente?.nome ? ` — Cliente: ${cliente.nome}` : '');
+        await query(
+          `INSERT INTO financeiro
+             (id, data, categoria, tipo, valor, descricao, created_at, updated_at)
+           VALUES (?, ?, 'Sinal / Entrada Venda', 'Entrada', ?, ?, NOW(), NOW())`,
+          [financId, hoje, valorSinal, descSinal]
+        );
+      } catch (finSinalErr) {
+        console.warn('[contracts] Aviso ao registrar sinal no financeiro:', finSinalErr?.message);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    // ─── Calcular e persistir parcelas (se parcelado) ─────────────────────────
     let parcelasParaCarne = [];
     if (quantidadeParcelas >= 1 && dataPrimeiraParcela) {
-      // Parse da data sem ambiguidade de fuso (tratada como UTC noon para evitar off-by-one)
+      // Limpar parcelas anteriores da mesma venda para não duplicar
+      await query('DELETE FROM vendas_parcelas WHERE contrato_id = ?', [vendaId]).catch(() => {});
+
       const [ano, mes, dia] = dataPrimeiraParcela.split('-').map(Number);
-      const valorTotal = Number(venda.valor_total || venda.valor || 0);
-      const valorParcela = valorTotal > 0 ? parseFloat((valorTotal / quantidadeParcelas).toFixed(2)) : 0;
+      const valorBaseParcelas = valorFinanciado > 0 ? valorFinanciado : valorTotal;
+      const valorParcela = valorBaseParcelas > 0 ? parseFloat((valorBaseParcelas / quantidadeParcelas).toFixed(2)) : 0;
 
       /**
        * Calcula a data de vencimento da parcela N (base 0).
@@ -207,15 +236,14 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
         const targetMonth = baseMes - 1 + offsetMeses; // 0-indexed
         const targetYear  = baseAno + Math.floor(targetMonth / 12);
         const targetMon   = ((targetMonth % 12) + 12) % 12; // 0-indexed, sem negativo
-        // Último dia válido do mês alvo
-        const lastDay = new Date(targetYear, targetMon + 1, 0).getDate();
-        const day     = Math.min(baseDia, lastDay);
+        const lastDay     = new Date(targetYear, targetMon + 1, 0).getDate();
+        const day         = Math.min(baseDia, lastDay);
         return new Date(targetYear, targetMon, day);
       }
 
       for (let i = 0; i < quantidadeParcelas; i++) {
         const dtVenc   = calcVencimento(ano, mes, dia, i);
-        const dtStr    = dtVenc.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+        const dtStr    = dtVenc.toISOString().split('T')[0];
         const parcelaId = uuidv4();
 
         await query(
@@ -224,7 +252,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
            VALUES (?, ?, ?, ?, ?, ?, 'pendente', NOW(), NOW())`,
           [
             parcelaId,
-            vendaId,          // contrato_id = id da venda (chave estrangeira flexível)
+            vendaId,
             venda.clienteId || null,
             i + 1,
             valorParcela,
@@ -239,7 +267,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
         });
       }
     }
-    // ───────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     ensureContractsDir();
     const clientName = sanitizeFileNamePart(cliente?.nome || venda?.cliente_nome || 'Cliente');
@@ -276,10 +304,13 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       parcelasGeradas: parcelasParaCarne.length,
     });
   } catch (error) {
-    console.error('Erro detalhado ao gerar contrato de venda de carro:', {
+    console.error('[POST /api/vendas_carros/:vendaId/contracts/generate] Erro detalhado:', {
       vendaId: req.params?.vendaId,
       body: req.body,
       message: error?.message,
+      code: error?.code,
+      sqlMessage: error?.sqlMessage,
+      sql: error?.sql,
       stack: error?.stack,
     });
     return res.status(500).json({ message: 'Erro ao gerar contrato de venda de carro', error: error.message });

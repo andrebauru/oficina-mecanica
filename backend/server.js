@@ -731,30 +731,46 @@ app.post('/api/auth/setup', safeRoute(async (req, res) => {
   return res.status(201).json({ authenticated: true, user: req.session.user, expiresInMs: ONE_HOUR_MS });
 }));
 
+// ─── ROTA DE LOGOUT ───────────────────────────────────────────────────────────
 app.post('/api/auth/logout', (req, res) => {
-  if (!req.session) {
-    return res.json({ authenticated: false });
-  }
-  req.session.destroy(() => {
-    res.json({ authenticated: false });
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ ok: false, message: 'Erro ao encerrar sessão.' });
+    }
+    res.clearCookie('hirata.sid');
+    return res.json({ ok: true, message: 'Sessão encerrada com sucesso.' });
   });
 });
 
-app.post('/api/auth/change-password', safeRoute(async (req, res) => {
-  const userId = req.session?.user?.id;
-  if (!userId) {
-    return sendAuthError(res, 401, 'Sessão inválida.');
+// ─── ROTA CHECK DE SESSÃO ─────────────────────────────────────────────────────
+app.get('/api/auth/me', (req, res) => {
+  if (req.session && req.session.user) {
+    return res.json({ ok: true, user: req.session.user });
   }
+  return res.status(401).json({ ok: false, message: 'Não autenticado.' });
+});
 
+// ─── ROTA DE ALTERAÇÃO DE SENHA ───────────────────────────────────────────────
+app.post('/api/auth/change-password', requireAuth, safeRoute(async (req, res) => {
   const { senhaAtual, novaSenha } = req.body || {};
+  const userId = req.session.user.id;
+
   if (!senhaAtual || !novaSenha) {
-    return sendAuthError(res, 400, 'Senha atual e nova senha são obrigatórias.');
+    return res.status(400).json({ ok: false, message: 'Senha atual e nova senha são obrigatórias.' });
   }
 
-  const rows = await query('SELECT id, senhaHash FROM usuarios WHERE id = ? LIMIT 1', [userId]);
-  const user = rows[0];
-  if (!user || !verifyPassword(senhaAtual, user.senhaHash)) {
-    return sendAuthError(res, 401, 'Senha atual incorreta.');
+  if (novaSenha.length < 6) {
+    return res.status(400).json({ ok: false, message: 'A nova senha deve ter no mínimo 6 caracteres.' });
+  }
+
+  const passwordColumn = await resolveUserPasswordColumn();
+  const rows = await query(`SELECT ${passwordColumn} AS senhaHash FROM usuarios WHERE id = ? LIMIT 1`, [userId]);
+  if (rows.length === 0) {
+    return res.status(404).json({ ok: false, message: 'Usuário não encontrado.' });
+  }
+
+  if (!verifyPassword(senhaAtual, rows[0].senhaHash)) {
+    return res.status(400).json({ ok: false, message: 'Senha atual incorreta.' });
   }
 
   const newHash = upgradePasswordHash(novaSenha);
@@ -778,101 +794,159 @@ app.post('/api/documentos', safeRoute(async (req, res) => {
       dataUpload,
     } = req.body || {};
 
-    if (!entityId || !entityType || !base64 || !filename) {
-      return res.status(400).json({ message: 'entityId, entityType, base64 e filename são obrigatórios.' });
+    if (!entityId || !entityType || (!base64 && !req.body?.filePath)) {
+      return res.status(400).json({ message: 'entityId, entityType e base64/filePath são obrigatórios.' });
     }
 
-    // Remover prefixo de Data URL (ex: data:image/jpeg;base64,)
-    const base64Data = base64.replace(/^data:[^;]+;base64,/, '');
-    const inferredFileType = typeof base64 === 'string'
-      ? (base64.match(/^data:([^;]+);base64,/)?.[1] || null)
-      : null;
-    const fileTypeFinal = fileType || inferredFileType;
+    const safeFilename = (filename || 'doc.jpg').replace(/[^a-zA-Z0-9.\-_]/g, '');
     const safeEntityId = String(entityId).replace(/[^a-zA-Z0-9.\-_]/g, '') || '0';
     const safeEntityType = String(entityType).replace(/[^a-zA-Z0-9.\-_]/g, '') || 'entity';
-    const safeFilename = (filename || 'doc.jpg').replace(/[^a-zA-Z0-9.\-_]/g, '');
     const entityFolder = `${safeEntityType}_${safeEntityId}`;
 
-    // Garantir que a pasta do cliente exista
-    const uploadDir = path.join(__dirname, 'uploads', 'documentos', entityFolder);
-    fs.mkdirSync(uploadDir, { recursive: true });
+    let filePathRelativo = req.body?.filePath || null;
+    let fileTypeFinal = fileType || null;
 
-    const fileDest = path.join(uploadDir, safeFilename);
-    const filePathRelativo = `/api/uploads/documentos/${entityFolder}/${safeFilename}`;
+    if (base64) {
+      const base64Data = String(base64).replace(/^data:[^;]+;base64,/, '');
+      const inferredFileType = typeof base64 === 'string'
+        ? (base64.match(/^data:([^;]+);base64,/)?.[1] || null)
+        : null;
+      fileTypeFinal = fileType || inferredFileType;
 
-    // Salvar arquivo físico
-    fs.writeFileSync(fileDest, Buffer.from(base64Data, 'base64'));
+      const uploadDir = path.join(__dirname, 'uploads', 'documentos', entityFolder);
+      fs.mkdirSync(uploadDir, { recursive: true });
 
-    // Montar INSERT com colunas camelCase (schema legado em produção)
+      const fileDest = path.join(uploadDir, safeFilename);
+      filePathRelativo = `/api/uploads/documentos/${entityFolder}/${safeFilename}`;
+
+      try {
+        fs.writeFileSync(fileDest, Buffer.from(base64Data, 'base64'));
+      } catch (fsErr) {
+        console.error('[POST /api/documentos] Erro ao salvar arquivo físico:', fsErr);
+      }
+    }
+
     const dataUploadFinal = dataUpload
       ? new Date(dataUpload).toISOString().slice(0, 19).replace('T', ' ')
       : new Date().toISOString().slice(0, 19).replace('T', ' ');
 
     const docId = `doc_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const dbEntityType = safeEntityType === 'veiculos' ? 'veiculo' : safeEntityType === 'clientes' ? 'cliente' : safeEntityType;
 
-    const result = await query(
-      `INSERT INTO documentos (id, entity_id, entity_type, file_path, file_type, base64, filename, anotacao, categoria, referencia_id, referencia_tipo, data_upload)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        docId,
-        entityId ?? null,
-        entityType ?? null,
-        filePathRelativo ?? null,
-        fileTypeFinal || null,
-        '',
-        filename ?? null,
-        anotacao ?? null,
-        categoria ?? null,
-        referenciaId ?? null,
-        referenciaTipo ?? null,
-        dataUploadFinal ?? null,
-      ]
-    );
+    // Inserção resiliente no banco
+    try {
+      await query(
+        `INSERT INTO documentos (id, entity_id, entity_type, base64, filename, anotacao, categoria, referencia_id, referencia_tipo, arquivo_original, data_upload, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          docId,
+          entityId ?? null,
+          dbEntityType,
+          '',
+          filename ?? safeFilename,
+          anotacao ?? null,
+          categoria ?? null,
+          referenciaId ?? null,
+          referenciaTipo ?? null,
+          filePathRelativo ?? null,
+          dataUploadFinal,
+        ]
+      );
+    } catch (insertErr) {
+      console.warn('[POST /api/documentos] Tentando fallback para schema alternativo com file_path:', insertErr.message);
+      await query(
+        `INSERT INTO documentos (id, entity_id, entity_type, file_path, file_type, base64, filename, anotacao, categoria, referencia_id, referencia_tipo, data_upload)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          docId,
+          entityId ?? null,
+          dbEntityType,
+          filePathRelativo ?? null,
+          fileTypeFinal || null,
+          '',
+          filename ?? safeFilename,
+          anotacao ?? null,
+          categoria ?? null,
+          referenciaId ?? null,
+          referenciaTipo ?? null,
+          dataUploadFinal,
+        ]
+      );
+    }
 
     return res.status(201).json({
-      id: result?.insertId || docId,
+      id: docId,
       entityId,
       entityType,
-      filename,
-      fileType: fileTypeFinal || null,
+      filename: safeFilename,
+      fileType: fileTypeFinal,
       caminho: filePathRelativo,
       filePath: filePathRelativo,
       anotacao: anotacao || null,
       categoria: categoria || null,
     });
   } catch (err) {
-    console.error('Erro no Upload:', err);
-    return res.status(500).json({ error: err.message });
+    console.error('[POST /api/documentos] Erro no upload:', {
+      body: req.body,
+      message: err?.message,
+      code: err?.code,
+      sqlMessage: err?.sqlMessage,
+      stack: err?.stack,
+    });
+    return res.status(500).json({ message: 'Erro ao salvar documento', error: err.message });
   }
 }));
 
 app.get('/api/documentos/:entityType/:entityId', safeRoute(async (req, res) => {
   try {
     const { entityType, entityId } = req.params;
-    const rows = await query(
-      `SELECT
-         id,
-         entity_id AS entityId,
-         entity_type AS entityType,
-         filename,
-         anotacao,
-         categoria,
-         data_upload AS dataUpload,
-         file_path AS caminho,
-         file_path AS filePath,
-         file_type AS fileType
-       FROM documentos
-       WHERE entity_type = ? AND entity_id = ?
-       ORDER BY data_upload DESC`,
-      [entityType, entityId]
-    );
+    const safeType = entityType === 'veiculos' ? 'veiculo' : entityType === 'clientes' ? 'cliente' : entityType;
 
-    const debugUrls = rows.map((doc) => doc?.filePath || doc?.caminho || null).filter(Boolean);
-    console.info('[GET /api/documentos/:entityType/:entityId] URLs enviadas:', debugUrls);
+    let rows = [];
+    try {
+      rows = await query(
+        `SELECT
+           id,
+           entity_id AS entityId,
+           entity_type AS entityType,
+           filename,
+           anotacao,
+           categoria,
+           data_upload AS dataUpload,
+           COALESCE(arquivo_original, '') AS caminho,
+           COALESCE(arquivo_original, '') AS filePath
+         FROM documentos
+         WHERE (entity_type = ? OR entity_type = ?) AND entity_id = ?
+         ORDER BY data_upload DESC`,
+        [safeType, entityType, entityId]
+      );
+    } catch {
+      rows = await query(
+        `SELECT
+           id,
+           entity_id AS entityId,
+           entity_type AS entityType,
+           filename,
+           anotacao,
+           categoria,
+           data_upload AS dataUpload,
+           COALESCE(file_path, '') AS caminho,
+           COALESCE(file_path, '') AS filePath,
+           COALESCE(file_type, '') AS fileType
+         FROM documentos
+         WHERE (entity_type = ? OR entity_type = ?) AND entity_id = ?
+         ORDER BY data_upload DESC`,
+        [safeType, entityType, entityId]
+      );
+    }
 
     return res.json(rows);
   } catch (err) {
-    console.error('[GET /api/documentos/:entityType/:entityId] Erro ao listar documentos:', err);
+    console.error('[GET /api/documentos/:entityType/:entityId] Erro ao listar documentos:', {
+      params: req.params,
+      message: err?.message,
+      sqlMessage: err?.sqlMessage,
+    });
     throw err;
   }
 }));
@@ -906,7 +980,6 @@ app.post('/api/vendas_carros', safeRoute(async (req, res) => {
       );
     } catch (updateError) {
       console.error('Erro ao atualizar status do veículo:', updateError);
-      // Não bloqueia a resposta se falhar o UPDATE
     }
   }
 
@@ -919,17 +992,60 @@ app.post('/api/vendas_carros', safeRoute(async (req, res) => {
 app.put('/api/financeiro/parcelas/:id/pay', safeRoute(async (req, res) => {
   const { id } = req.params;
   try {
-    const rows = await query('SELECT * FROM parcelas WHERE id = ? LIMIT 1', [id]);
-    if (!rows.length) return res.status(404).json({ message: 'Parcela não encontrada' });
-    await query(
-      `UPDATE parcelas SET status = 'pago', data_pagamento = CURRENT_DATE() WHERE id = ?`,
-      [id]
-    );
-    const updated = await query('SELECT * FROM parcelas WHERE id = ? LIMIT 1', [id]);
+    const hoje = new Date().toISOString().split('T')[0];
+    let parcela = null;
+    let tabela = 'parcelas';
+
+    // 1. Tentar buscar em parcelas (vendas legadas)
+    const rowsLegacy = await query('SELECT * FROM parcelas WHERE id = ? LIMIT 1', [id]).catch(() => []);
+    if (rowsLegacy.length > 0) {
+      parcela = rowsLegacy[0];
+      tabela = 'parcelas';
+      await query(
+        `UPDATE parcelas SET status = 'pago', data_pagamento = ? WHERE id = ?`,
+        [hoje, id]
+      );
+    } else {
+      // 2. Tentar buscar em vendas_parcelas
+      const rowsVendas = await query('SELECT * FROM vendas_parcelas WHERE id = ? LIMIT 1', [id]).catch(() => []);
+      if (rowsVendas.length > 0) {
+        parcela = rowsVendas[0];
+        tabela = 'vendas_parcelas';
+        await query(
+          `UPDATE vendas_parcelas SET status = 'pago', data_pagamento = ?, updated_at = NOW() WHERE id = ?`,
+          [hoje, id]
+        );
+      }
+    }
+
+    if (!parcela) return res.status(404).json({ message: 'Parcela não encontrada' });
+
+    // Inserir no financeiro se não estava paga (Regime de Caixa)
+    if (parcela.status !== 'pago') {
+      try {
+        const financId = `fin_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const desc = `Parcela ${parcela.numero_parcela || ''} recebida` +
+          (parcela.client_id ? ` — cliente ID ${parcela.client_id}` : '');
+        await query(
+          `INSERT INTO financeiro (id, data, categoria, tipo, valor, descricao, created_at, updated_at)
+           VALUES (?, ?, 'Parcela Venda', 'Entrada', ?, ?, NOW(), NOW())`,
+          [financId, hoje, parcela.valor, desc]
+        );
+      } catch (finErr) {
+        console.error('[pay] Falha ao inserir lançamento financeiro:', finErr?.message);
+      }
+    }
+
+    const updated = await query(`SELECT * FROM ${tabela} WHERE id = ? LIMIT 1`, [id]);
     return res.json(updated[0]);
   } catch (err) {
-    console.error('[PUT /api/financeiro/parcelas/:id/pay]', err);
-    throw err;
+    console.error('[PUT /api/financeiro/parcelas/:id/pay] Erro:', {
+      parcelaId: req.params?.id,
+      message: err?.message,
+      sqlMessage: err?.sqlMessage,
+      stack: err?.stack,
+    });
+    return res.status(500).json({ message: 'Erro ao dar baixa na parcela', error: err.message });
   }
 }));
 
@@ -937,17 +1053,46 @@ app.put('/api/financeiro/parcelas/:id/pay', safeRoute(async (req, res) => {
 app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
   const { id } = req.params;
   try {
-    const rows = await query(
-      `SELECT p.*, v.numero_parcelas AS totalParcelas, v.placa, v.chassi,
-              CONCAT(COALESCE(vc2.fabricante,''), ' ', COALESCE(vc2.modelo,'')) AS veiculoDesc
-       FROM parcelas p
-       LEFT JOIN vendas v ON p.venda_id = v.id
-       LEFT JOIN veiculos vc2 ON v.veiculo_id = vc2.id
-       WHERE p.id = ? LIMIT 1`,
-      [id]
-    );
-    if (!rows.length) return res.status(404).json({ message: 'Parcela não encontrada' });
-    const parcela = rows[0];
+    let parcela = null;
+
+    // 1. Tentar buscar na tabela parcelas (vendas legadas)
+    try {
+      const rowsLegacy = await query(
+        `SELECT p.*, v.numero_parcelas AS totalParcelas, v.placa, v.chassi,
+                CONCAT(COALESCE(vc2.fabricante,''), ' ', COALESCE(vc2.modelo,'')) AS veiculoDesc,
+                p.cliente_nome, p.cliente_telefone
+         FROM parcelas p
+         LEFT JOIN vendas v ON p.venda_id = v.id
+         LEFT JOIN veiculos vc2 ON v.veiculo_id = vc2.id
+         WHERE p.id = ? LIMIT 1`,
+        [id]
+      );
+      if (rowsLegacy.length > 0) {
+        parcela = rowsLegacy[0];
+      }
+    } catch { /* continuar */ }
+
+    // 2. Se não encontrou, buscar na tabela vendas_parcelas (vendas_carros)
+    if (!parcela) {
+      const rowsVendas = await query(
+        `SELECT vp.*, 
+                vc.parcelas AS totalParcelas,
+                CONCAT(COALESCE(vc.fabricante,''), ' ', COALESCE(vc.modelo,''), ' ', COALESCE(vc.ano,'')) AS veiculoDesc,
+                COALESCE(c.nome, vp.observacoes, 'Cliente') AS cliente_nome,
+                c.telefone AS cliente_telefone,
+                c.endereco AS cliente_endereco
+         FROM vendas_parcelas vp
+         LEFT JOIN clientes c ON vp.client_id = c.id
+         LEFT JOIN vendas_carros vc ON vp.contrato_id = vc.id
+         WHERE vp.id = ? LIMIT 1`,
+        [id]
+      );
+      if (rowsVendas.length > 0) {
+        parcela = rowsVendas[0];
+      }
+    }
+
+    if (!parcela) return res.status(404).json({ message: 'Parcela não encontrada' });
 
     const cfgRows = await query('SELECT * FROM configuracoes LIMIT 1').catch(() => []);
     const cfg = cfgRows[0] || {};
@@ -964,12 +1109,14 @@ app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
     const dataVencimento = parcela.data_vencimento
       ? new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')
       : '—';
-    const totalParcelas = parcela.totalParcelas || '?';
+    const totalParcelas = parcela.totalParcelas || parcela.numero_parcelas || '?';
     const numeroParcela = parcela.numero_parcela || '?';
     const valor = Number(parcela.valor || 0).toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' });
-    const veiculoDesc = (parcela.veiculoDesc || '').trim() || (parcela.placa ? `Placa: ${parcela.placa}` : 'Serviço');
+    const veiculoDesc = (parcela.veiculoDesc || '').trim() || (parcela.placa ? `Placa: ${parcela.placa}` : 'Veículo / Serviço');
     const nomeEmpresa = cfg.nomeEmpresa || 'Hirata Cars';
+    const enderecoEmpresa = cfg.endereco || '';
     const telefoneEmpresa = cfg.telefone || '';
+    const emailEmpresa = cfg.email || '';
     const licenca = cfg.numeroAutorizacao || '';
 
     const html = `<!DOCTYPE html>
@@ -979,56 +1126,102 @@ app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Helvetica Neue', Arial, 'Noto Sans JP', sans-serif;
     font-size: 13px;
-    color: #222;
+    color: #1e293b;
     padding: 30px 40px;
     position: relative;
+    background: #fff;
   }
   .watermark {
     position: fixed;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 340px; height: 340px;
+    width: 360px; height: 360px;
     background-image: url('${logoBase64}');
     background-repeat: no-repeat;
     background-size: contain;
     background-position: center;
-    opacity: 0.07;
+    opacity: 0.05;
     pointer-events: none;
     z-index: 0;
   }
   .content { position: relative; z-index: 1; }
-  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a237e; padding-bottom: 12px; margin-bottom: 18px; }
-  .header-logo img { height: 60px; }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #1a237e;
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+  }
+  .header-logo img {
+    height: 85px;
+    max-width: 260px;
+    object-fit: contain;
+    display: block;
+  }
   .company-info { text-align: right; }
-  .company-name { font-size: 18px; font-weight: bold; color: #1a237e; }
-  .company-sub { font-size: 11px; color: #555; margin-top: 3px; }
-  h1 { text-align: center; font-size: 20px; color: #1a237e; margin-bottom: 20px; letter-spacing: 1px; text-transform: uppercase; }
-  .info-box { background: #f5f7ff; border: 1px solid #c5cae9; border-radius: 6px; padding: 16px 20px; margin-bottom: 18px; }
-  .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #e0e0e0; }
+  .company-name { font-size: 20px; font-weight: 800; color: #1a237e; }
+  .company-sub { font-size: 11px; color: #475569; margin-top: 2px; line-height: 1.3; }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    color: #1a237e;
+    margin: 15px 0 20px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+  .recibo-num { text-align: right; font-size: 11px; color: #64748b; margin-bottom: 6px; font-weight: 600; }
+  .info-box {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 22px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
   .info-row:last-child { border-bottom: none; }
-  .info-label { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .info-value { font-weight: 600; font-size: 13px; }
-  .valor-destaque { font-size: 22px; font-weight: bold; color: #1b5e20; text-align: center; background: #e8f5e9; border: 2px solid #a5d6a7; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
-  .footer { margin-top: 40px; }
-  .assinatura-row { display: flex; gap: 40px; justify-content: center; margin-top: 30px; }
-  .assinatura-box { flex: 1; max-width: 200px; text-align: center; }
-  .assinatura-line { border-top: 1px solid #333; margin-bottom: 6px; height: 50px; }
-  .assinatura-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-  .recibo-num { text-align: right; font-size: 10px; color: #888; margin-bottom: 4px; }
+  .info-label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .info-value { font-weight: 700; font-size: 13px; color: #0f172a; }
+  .valor-destaque {
+    font-size: 24px;
+    font-weight: 800;
+    color: #15803d;
+    text-align: center;
+    background: #f0fdf4;
+    border: 2px solid #86efac;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 24px;
+  }
+  .footer { margin-top: 35px; }
+  .declaracao { font-size: 11px; color: #475569; text-align: center; margin-bottom: 25px; line-height: 1.5; }
+  .assinatura-row { display: flex; gap: 40px; justify-content: center; margin-top: 35px; }
+  .assinatura-box { flex: 1; max-width: 220px; text-align: center; }
+  .assinatura-line { border-top: 1.5px solid #334155; margin-bottom: 8px; height: 50px; }
+  .assinatura-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
 </style>
 </head>
 <body>
 <div class="watermark"></div>
 <div class="content">
-  <p class="recibo-num">Recibo Nº ${id.slice(-8).toUpperCase()}</p>
+  <p class="recibo-num">Recibo Nº ${String(id).slice(-8).toUpperCase()}</p>
   <div class="header">
     <div class="header-logo">${logoBase64 ? `<img src="${logoBase64}" alt="${nomeEmpresa}" />` : ''}</div>
     <div class="company-info">
       <div class="company-name">${nomeEmpresa}</div>
+      ${enderecoEmpresa ? `<div class="company-sub">${enderecoEmpresa}</div>` : ''}
       ${telefoneEmpresa ? `<div class="company-sub">Tel: ${telefoneEmpresa}</div>` : ''}
-      ${licenca ? `<div class="company-sub">Lic. Nº ${licenca}</div>` : ''}
+      ${emailEmpresa ? `<div class="company-sub">Email: ${emailEmpresa}</div>` : ''}
+      ${licenca ? `<div class="company-sub">古物商許可番号: ${licenca}</div>` : ''}
     </div>
   </div>
 
@@ -1036,32 +1229,39 @@ app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
 
   <div class="info-box">
     <div class="info-row">
-      <span class="info-label">Cliente</span>
+      <span class="info-label">Cliente / 買主</span>
       <span class="info-value">${parcela.cliente_nome || '—'}</span>
     </div>
+    ${parcela.cliente_telefone ? `
     <div class="info-row">
-      <span class="info-label">Referente a</span>
+      <span class="info-label">Telefone</span>
+      <span class="info-value">${parcela.cliente_telefone}</span>
+    </div>` : ''}
+    <div class="info-row">
+      <span class="info-label">Referente a / 対象</span>
       <span class="info-value">${veiculoDesc}</span>
     </div>
     <div class="info-row">
-      <span class="info-label">Parcela</span>
+      <span class="info-label">Parcela / 回数</span>
       <span class="info-value">${numeroParcela} / ${totalParcelas}</span>
     </div>
     <div class="info-row">
-      <span class="info-label">Vencimento</span>
+      <span class="info-label">Vencimento / 支払期日</span>
       <span class="info-value">${dataVencimento}</span>
     </div>
     <div class="info-row">
-      <span class="info-label">Data de Pagamento</span>
+      <span class="info-label">Data de Pagamento / 受領日</span>
       <span class="info-value">${dataPagamento}</span>
     </div>
   </div>
 
-  <div class="valor-destaque">Valor Recebido: ${valor}</div>
+  <div class="valor-destaque">Valor Recebido / 受領金額: ${valor}</div>
 
   <div class="footer">
-    <p style="font-size:11px; color:#666; text-align:center; margin-bottom:20px;">
-      Declaro que recebi a importância acima referente ao pagamento da parcela ${numeroParcela}/${totalParcelas}.
+    <p class="declaracao">
+      Declaro que recebi a importância de <strong>${valor}</strong> referente à parcela ${numeroParcela}/${totalParcelas} do veículo/serviço acima discriminado.
+      <br/>
+      上記金額を正に領収いたしました。
     </p>
     <div class="assinatura-row">
       <div class="assinatura-box">
@@ -1070,7 +1270,7 @@ app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
       </div>
       <div class="assinatura-box">
         <div class="assinatura-line"></div>
-        <div class="assinatura-label">Assinatura do Responsável</div>
+        <div class="assinatura-label">Hirata Cars Shop</div>
       </div>
     </div>
   </div>
@@ -1099,8 +1299,14 @@ app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
       await browser.close();
     }
   } catch (err) {
-    console.error('[GET /api/financeiro/parcelas/:id/recibo]', err);
-    throw err;
+    console.error('[GET /api/financeiro/parcelas/:id/recibo] Erro ao gerar recibo:', {
+      parcelaId: req.params?.id,
+      message: err?.message,
+      code: err?.code,
+      sqlMessage: err?.sqlMessage,
+      stack: err?.stack,
+    });
+    return res.status(500).json({ message: 'Erro ao gerar recibo PDF', error: err.message });
   }
 }));
 // ─────────────────────────────────────────────────────────────────────────────
