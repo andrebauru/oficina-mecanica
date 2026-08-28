@@ -47,9 +47,13 @@ export default function ContratoVendaDialog({
   const [preco, setPreco] = useState<string>('');
   const [sinal, setSinal] = useState<string>('');
   const [parcelas, setParcelas] = useState<string>('1');
+  const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState<string>(
+    new Date().toISOString().split('T')[0] // default = hoje
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
+
 
   const MENSAGEM_CONFIRMAR_SEM_DOCUMENTO = 'Este cliente não possui CNH/Documento anexado. Deseja continuar com a venda e gerar o contrato mesmo assim?';
 
@@ -130,7 +134,8 @@ export default function ContratoVendaDialog({
       // 2. Converter PDF para base64
       const pdfBase64 = await converterParaBase64(pdfBlob);
 
-      // 3. Enviar para servidor com PDF em base64
+      // 3. Enviar para servidor — rota definitiva (backend gera o PDF)
+      // OBS: pdfBase64 permanece como fallback de compatibilidade
       const response = await axios.post('/api/contracts/generate', {
         cliente_id: clienteId,
         veiculo_id: veiculoId,
@@ -138,8 +143,12 @@ export default function ContratoVendaDialog({
         sinal: sinalNum,
         parcelas: parcelasNum,
         idioma: idiomaSelecionado,
-        pdfBase64: pdfBase64, // ← Enviando PDF em base64
+        pdfBase64: pdfBase64,
+        // Campos do carnê de parcelas
+        quantidadeParcelas: parcelasNum > 1 ? parcelasNum : 0,
+        dataPrimeiraParcela: parcelasNum > 1 ? dataPrimeiraParcela : null,
       });
+
 
       if (!response.data || !response.data.success) {
         throw new Error('Erro ao salvar contrato no servidor');
@@ -166,9 +175,11 @@ export default function ContratoVendaDialog({
     setPreco('');
     setSinal('');
     setParcelas('1');
+    setDataPrimeiraParcela(new Date().toISOString().split('T')[0]);
     setError('');
     setSucesso(false);
   };
+
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -255,6 +266,20 @@ export default function ContratoVendaDialog({
           inputProps={{ min: '1' }}
           sx={{ mb: 2 }}
         />
+
+        {/* Data da 1ª Parcela — visível apenas quando parcelado */}
+        {parseInt(parcelas || '1') > 1 && (
+          <TextField
+            fullWidth
+            label="Data de Vencimento da 1ª Parcela"
+            type="date"
+            value={dataPrimeiraParcela}
+            onChange={(e) => setDataPrimeiraParcela(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            inputProps={{ min: new Date().toISOString().split('T')[0] }}
+            sx={{ mb: 2 }}
+          />
+        )}
 
         {/* Resumo */}
         {preco && (

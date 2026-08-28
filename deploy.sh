@@ -53,4 +53,4 @@ pm2 save
 echo "Sistema Hirata Cars atualizado e protegido!"
 echo ""
 echo "Caminho do servidor principal: ${PROJECT_DIR}/backend/server.js"
-echo "Arquivo PM2:                   ${PROJECT_DIR}/ecosystem.config.js"
+echo "Arquivo PM2:                   ${PROJECT_DIR}/ecosystem.config.cjs"

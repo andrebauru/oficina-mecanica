@@ -739,6 +739,108 @@ function buildContractHtml({ idiomas = ['pt', 'ja'], payload, isBlank = false })
   `;
 }
 
+// ─── Carnê de Parcelas ──────────────────────────────────────────────────────
+/**
+ * Gera o bloco HTML do carnê de parcelas.
+ * Recebe um array de objetos { numero, data_vencimento (Date|string), valor }.
+ * Retorna uma string HTML que começa com page-break-before:always para
+ * ser concatenada diretamente ao HTML do contrato antes do </body>.
+ */
+function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
+  if (!Array.isArray(parcelas) || parcelas.length === 0) return '';
+
+  const currency = (v) =>
+    new Intl.NumberFormat('ja-JP', {
+      style: 'currency',
+      currency: 'JPY',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(Number(v || 0));
+
+  const fmtDate = (d) => {
+    const dt = d instanceof Date ? d : new Date(d);
+    if (isNaN(dt.getTime())) return '—';
+    return dt.toLocaleDateString('pt-BR');
+  };
+
+  const rows = parcelas
+    .map(
+      (p, i) => `
+        <tr style="${i % 2 === 0 ? 'background:#f8fafc;' : 'background:#fff;'}">
+          <td style="padding:6px 8px; text-align:center; font-weight:700;">${p.numero}</td>
+          <td style="padding:6px 8px; text-align:center;">${fmtDate(p.data_vencimento)}</td>
+          <td style="padding:6px 8px; text-align:right; font-weight:600;">${currency(p.valor)}</td>
+          <td style="padding:6px 8px; text-align:center;">
+            <span style="
+              display:inline-block;
+              width:14px; height:14px;
+              border:2px solid #374151;
+              border-radius:2px;
+              vertical-align:middle;
+              margin-right:5px;
+            "></span>
+            Pago
+          </td>
+          <td style="padding:6px 8px;"></td>
+        </tr>`
+    )
+    .join('');
+
+  return `
+    <div style="
+      page-break-before: always;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 11px;
+      color: #111;
+      padding: 0;
+    ">
+      <!-- Cabeçalho do Carnê -->
+      <div style="
+        text-align: center;
+        border-bottom: 3px solid #1e293b;
+        padding-bottom: 8px;
+        margin-bottom: 14px;
+      ">
+        <p style="margin:0; font-size:16px; font-weight:700;">分割払い手帳 / Carnê de Parcelas</p>
+        <p style="margin:4px 0 0; font-size:11px; color:#374151;">
+          Cliente: <strong>${escapeHtml(clienteNome || '—')}</strong>
+          &nbsp;|&nbsp;
+          Veículo: <strong>${escapeHtml(veiculoInfo || '—')}</strong>
+        </p>
+      </div>
+
+      <!-- Tabela de Parcelas -->
+      <table style="
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        overflow: hidden;
+      ">
+        <thead>
+          <tr style="background:#1e293b; color:#fff;">
+            <th style="padding:7px 8px; text-align:center; font-size:11px;">Nº</th>
+            <th style="padding:7px 8px; text-align:center; font-size:11px;">Vencimento / 支払期日</th>
+            <th style="padding:7px 8px; text-align:right;  font-size:11px;">Valor / 金額</th>
+            <th style="padding:7px 8px; text-align:center; font-size:11px;">Situação / 状況</th>
+            <th style="padding:7px 8px; text-align:left;   font-size:11px;">Assinatura / 署名</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+
+      <!-- Rodapé do Carnê -->
+      <p style="margin-top:14px; font-size:9px; color:#6b7280; text-align:center;">
+        Este carnê é um documento auxiliar. O contrato de compra e venda prevalece em caso de divergência.
+        / このカルネは補助書類です。相違がある場合は売買契約書が優先されます。
+      </p>
+    </div>
+  `;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildPuppeteerLaunchOptions() {
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
   return {
@@ -754,7 +856,20 @@ function buildPuppeteerLaunchOptions() {
   };
 }
 
-async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], isBlank = false, venda, cliente, documento, veiculo, configuracao }) {
+/**
+ * @param {object} opts
+ * @param {string[]}  opts.idiomas
+ * @param {boolean}   opts.isBlank
+ * @param {object}    opts.venda
+ * @param {object}    opts.cliente
+ * @param {object}    opts.documento
+ * @param {object}    opts.veiculo
+ * @param {object}    opts.configuracao
+ * @param {Array}     [opts.parcelasParaCarne]  Array de { numero, data_vencimento, valor }
+ *                                              Se fornecido e não-vazio, uma página extra de
+ *                                              carnê será acrescentada ao PDF.
+ */
+async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], isBlank = false, venda, cliente, documento, veiculo, configuracao, parcelasParaCarne }) {
   const payload = {
     venda: venda || {},
     cliente: cliente || {},
@@ -768,7 +883,18 @@ async function generateContractPdfBuffer({ idiomas = ['pt', 'ja'], isBlank = fal
       : buildInstallments(venda),
   };
 
-  const html = buildContractHtml({ idiomas, payload, isBlank });
+  // Monta HTML base do contrato e, se houver parcelas, injeta o carnê antes de </body>
+  const contractHtml = buildContractHtml({ idiomas, payload, isBlank });
+  const clienteNome   = cliente?.nome || venda?.cliente_nome || '';
+  const veiculoInfo   = `${venda?.fabricante || veiculo?.marca || ''} ${venda?.modelo || veiculo?.modelo || ''} ${venda?.ano || veiculo?.ano || ''}`.trim();
+  const carneBloco    = (!isBlank && Array.isArray(parcelasParaCarne) && parcelasParaCarne.length > 0)
+    ? buildCarneHtml(parcelasParaCarne, clienteNome, veiculoInfo)
+    : '';
+
+  // Injeta o bloco do carnê imediatamente antes de </body>
+  const html = carneBloco
+    ? contractHtml.replace('</body>', `${carneBloco}</body>`)
+    : contractHtml;
   const logoSrc = getLogoBase64();
   const browser = await puppeteer.launch(buildPuppeteerLaunchOptions());
 

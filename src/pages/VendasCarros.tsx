@@ -169,6 +169,21 @@ const VendasCarros = () => {
   const [contratoDialogVendaId, setContratoDialogVendaId] = useState('');
   const [contratoDialogClienteNome, setContratoDialogClienteNome] = useState('');
 
+  // Estado para o carnê: qtd de parcelas e data da 1ª parcela (capturados no dialog de gerar)
+  const [carneQtd, setCarneQtd] = useState('');
+  const [carneData, setCarneData] = useState(new Date().toISOString().split('T')[0]);
+  const [carneDialogOpen, setCarneDialogOpen] = useState(false);
+  const [carneVendaIdPendente, setCarneVendaIdPendente] = useState<string | null>(null);
+
+  // Estado para o modal de parcelas (detalhes de uma venda)
+  const [parcelasModalOpen, setParcelasModalOpen] = useState(false);
+  const [parcelasModalLoading, setParcelasModalLoading] = useState(false);
+  const [parcelasModalData, setParcelasModalData] = useState<Array<{
+    id: string; numero_parcela: number; valor: number;
+    data_vencimento: string; status: string; data_pagamento: string | null;
+  }>>([]);
+  const [parcelasModalTitulo, setParcelasModalTitulo] = useState('');
+
   const MENSAGEM_CONFIRMAR_SEM_DOCUMENTO = 'Este cliente não possui CNH/Documento anexado. Deseja continuar com a venda e gerar o contrato mesmo assim?';
 
   // Cálculo automático de valorTotal e valorParcela
@@ -325,11 +340,28 @@ const VendasCarros = () => {
       }
     }
 
+    // Abre dialog para capturar dados do carnê antes de gerar o contrato
+    setCarneQtd(String(venda?.parcelas ?? 1));
+    setCarneData(new Date().toISOString().split('T')[0]);
+    setCarneVendaIdPendente(vendaId);
+    setCarneDialogOpen(true);
+  };
+
+  const handleConfirmarGerarContrato = async () => {
+    const vendaId = carneVendaIdPendente;
+    if (!vendaId) return;
+    setCarneDialogOpen(false);
+    const qtdParcelas = parseInt(carneQtd || '0', 10);
+
     try {
       await axios.post(`/api/vendas_carros/${vendaId}/contracts/generate`, {
         idiomas: idiomasContrato.length > 0 ? idiomasContrato : IDIOMAS_CONTRATO_PADRAO,
-        documentoVerificado: !!clienteId,
+        documentoVerificado: true,
+        // Dados do carnê de parcelas
+        quantidadeParcelas: qtdParcelas > 1 ? qtdParcelas : 0,
+        dataPrimeiraParcela: qtdParcelas > 1 ? carneData : null,
       });
+      const venda = vendasCarros.find(v => v.id === vendaId);
       await fetchVendasCarros();
       setContratoDialogVendaId(vendaId);
       setContratoDialogClienteNome(venda?.clienteNome || 'Cliente');
@@ -819,6 +851,31 @@ const VendasCarros = () => {
                         </Box>
                       </TableCell>
                       <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                        {/* Botão: Ver Parcelas */}
+                        <IconButton
+                          color="info"
+                          size="small"
+                          title="Ver parcelas desta venda"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setParcelasModalTitulo(`${vendaCarro.clienteNome || 'Cliente'} — ${vendaCarro.fabricante} ${vendaCarro.modelo}`);
+                            setParcelasModalOpen(true);
+                            setParcelasModalLoading(true);
+                            setParcelasModalData([]);
+                            try {
+                              // Busca parcelas pelo id da venda (contrato_id)
+                              const { data } = await axios.get(`/api/contracts/${vendaCarro.id}/parcelas`);
+                              setParcelasModalData(Array.isArray(data) ? data : []);
+                            } catch {
+                              setSnackbar({ open: true, message: 'Erro ao carregar parcelas.', severity: 'error' });
+                            } finally {
+                              setParcelasModalLoading(false);
+                            }
+                          }}
+                        >
+                          <VisibilityIcon />
+                        </IconButton>
+                        {/* Botão: Gerar Contrato */}
                         <IconButton
                           color="warning"
                           onClick={(e) => {
@@ -1168,6 +1225,127 @@ const VendasCarros = () => {
           <Button fullWidth onClick={() => setContratoDialogOpen(false)} color="inherit">
             Fechar
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ══ Dialog: Confirmar dados do Carnê antes de gerar contrato ══ */}
+      <Dialog open={carneDialogOpen} onClose={() => setCarneDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Gerar Contrato + Carnê de Parcelas</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Defina as condições do carnê para incluir no PDF do contrato.
+            Se não quiser carnê, deixe a quantidade em 1.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Quantidade de Parcelas"
+            type="number"
+            value={carneQtd}
+            onChange={e => setCarneQtd(e.target.value)}
+            inputProps={{ min: 1 }}
+          />
+          {parseInt(carneQtd || '1') > 1 && (
+            <TextField
+              fullWidth
+              label="Data de Vencimento da 1ª Parcela"
+              type="date"
+              value={carneData}
+              onChange={e => setCarneData(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCarneDialogOpen(false)} color="inherit">Cancelar</Button>
+          <Button onClick={handleConfirmarGerarContrato} variant="contained" color="warning">
+            Gerar Contrato
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ══ Dialog: Detalhes das Parcelas de uma Venda ══ */}
+      <Dialog open={parcelasModalOpen} onClose={() => setParcelasModalOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>
+          💳 Parcelas — {parcelasModalTitulo}
+        </DialogTitle>
+        <DialogContent>
+          {parcelasModalLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+          ) : (
+            <>
+              {parcelasModalData.length > 0 && (() => {
+                const totalPago = parcelasModalData
+                  .filter(p => p.status === 'pago')
+                  .reduce((s, p) => s + Number(p.valor), 0);
+                const totalRestante = parcelasModalData
+                  .filter(p => p.status !== 'pago')
+                  .reduce((s, p) => s + Number(p.valor), 0);
+                return (
+                  <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                    <Box sx={{ px: 2, py: 1, borderRadius: 1, backgroundColor: '#e8f5e9', textAlign: 'center' }}>
+                      <Typography variant="caption" color="text.secondary">✓ Total Pago até agora</Typography>
+                      <Typography fontWeight="bold" color="success.main">{formatCurrency(totalPago)}</Typography>
+                    </Box>
+                    <Box sx={{ px: 2, py: 1, borderRadius: 1, backgroundColor: '#fff3e0', textAlign: 'center' }}>
+                      <Typography variant="caption" color="text.secondary">⏳ Total Restante a Pagar</Typography>
+                      <Typography fontWeight="bold" color="warning.main">{formatCurrency(totalRestante)}</Typography>
+                    </Box>
+                  </Box>
+                );
+              })()}
+
+              <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: '#1a237e' }}>
+                      <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Nº</TableCell>
+                      <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Vencimento</TableCell>
+                      <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="right">Valor</TableCell>
+                      <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Status</TableCell>
+                      <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Pagamento</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {parcelasModalData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                            Nenhuma parcela registrada para esta venda. Gere o contrato com carnê para criar as parcelas.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ) : parcelasModalData.map(p => (
+                      <TableRow
+                        key={p.id}
+                        sx={{ backgroundColor: p.status === 'pago' ? '#f1f8e9' : 'inherit' }}
+                      >
+                        <TableCell align="center" sx={{ fontWeight: 'bold' }}>{p.numero_parcela}</TableCell>
+                        <TableCell align="center">
+                          {p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR') : '—'}
+                        </TableCell>
+                        <TableCell align="right">{formatCurrency(p.valor)}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={p.status === 'pago' ? '✓ Pago' : 'Pendente'}
+                            color={p.status === 'pago' ? 'success' : 'warning'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          {p.data_pagamento
+                            ? new Date(p.data_pagamento).toLocaleDateString('pt-BR')
+                            : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setParcelasModalOpen(false)} color="inherit">Fechar</Button>
         </DialogActions>
       </Dialog>
 

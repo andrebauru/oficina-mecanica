@@ -153,6 +153,10 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     const { vendaId } = req.params;
     const { idiomas, invalid } = normalizeContractLanguages(req.body);
 
+    // Campos opcionais do carnê de parcelas
+    const quantidadeParcelas = parseInt(req.body.quantidadeParcelas || 0, 10);
+    const dataPrimeiraParcela = req.body.dataPrimeiraParcela || null; // 'YYYY-MM-DD'
+
     if (invalid.length > 0) {
       return res.status(400).json({
         message: `Idioma inválido. Use apenas: ${VALID_CONTRACT_LANGUAGES.join(', ')}.`,
@@ -186,6 +190,57 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     const configRows = await query('SELECT * FROM configuracoes ORDER BY id DESC LIMIT 1');
     const configuracao = configRows[0] || null;
 
+    // ─── Calcular e persistir parcelas (se solicitado) ───────────────────────
+    let parcelasParaCarne = [];
+    if (quantidadeParcelas >= 1 && dataPrimeiraParcela) {
+      // Parse da data sem ambiguidade de fuso (tratada como UTC noon para evitar off-by-one)
+      const [ano, mes, dia] = dataPrimeiraParcela.split('-').map(Number);
+      const valorTotal = Number(venda.valor_total || venda.valor || 0);
+      const valorParcela = valorTotal > 0 ? parseFloat((valorTotal / quantidadeParcelas).toFixed(2)) : 0;
+
+      /**
+       * Calcula a data de vencimento da parcela N (base 0).
+       * Resolve o "Bug do Dia 31": se o dia original não existir no mês alvo,
+       * trava no último dia válido daquele mês (ex: 31/jan + 1mês → 28/fev, não 03/mar).
+       */
+      function calcVencimento(baseAno, baseMes, baseDia, offsetMeses) {
+        const targetMonth = baseMes - 1 + offsetMeses; // 0-indexed
+        const targetYear  = baseAno + Math.floor(targetMonth / 12);
+        const targetMon   = ((targetMonth % 12) + 12) % 12; // 0-indexed, sem negativo
+        // Último dia válido do mês alvo
+        const lastDay = new Date(targetYear, targetMon + 1, 0).getDate();
+        const day     = Math.min(baseDia, lastDay);
+        return new Date(targetYear, targetMon, day);
+      }
+
+      for (let i = 0; i < quantidadeParcelas; i++) {
+        const dtVenc   = calcVencimento(ano, mes, dia, i);
+        const dtStr    = dtVenc.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+        const parcelaId = uuidv4();
+
+        await query(
+          `INSERT INTO vendas_parcelas
+           (id, contrato_id, client_id, numero_parcela, valor, data_vencimento, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pendente', NOW(), NOW())`,
+          [
+            parcelaId,
+            vendaId,          // contrato_id = id da venda (chave estrangeira flexível)
+            venda.clienteId || null,
+            i + 1,
+            valorParcela,
+            dtStr,
+          ]
+        );
+
+        parcelasParaCarne.push({
+          numero: i + 1,
+          data_vencimento: dtVenc,
+          valor: valorParcela,
+        });
+      }
+    }
+    // ───────────────────────────────────────────────────────────
+
     ensureContractsDir();
     const clientName = sanitizeFileNamePart(cliente?.nome || venda?.cliente_nome || 'Cliente');
     const fileDate = new Date().toISOString().slice(0, 10);
@@ -200,6 +255,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       documento,
       veiculo,
       configuracao,
+      parcelasParaCarne, // <- carnê injetado no PDF quando existir
     });
 
     fs.writeFileSync(absolutePath, pdfBuffer);
@@ -217,6 +273,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
       contratoGeradoEm: new Date().toISOString(),
       viewUrl: `/api/vendas_carros/${venda.id}/contracts/view`,
       downloadUrl: `/api/vendas_carros/${venda.id}/contracts/download`,
+      parcelasGeradas: parcelasParaCarne.length,
     });
   } catch (error) {
     console.error('Erro detalhado ao gerar contrato de venda de carro:', {
@@ -228,6 +285,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     return res.status(500).json({ message: 'Erro ao gerar contrato de venda de carro', error: error.message });
   }
 });
+
 
 // Visualização inline do contrato já gerado
 router.get('/vendas_carros/:vendaId/contracts/view', async (req, res) => {
@@ -673,7 +731,9 @@ router.get('/contracts/:contractId/parcelas', async (req, res) => {
 
 /**
  * PUT /api/parcelas/:parcelaId
- * Atualiza o status de uma parcela (pago, atrasado, pendente, devolvido)
+ * Atualiza o status de uma parcela.
+ * Quando status = 'pago': também insere automaticamente um lançamento de
+ * Entrada na tabela `financeiro` (Regime de Caixa).
  */
 router.put('/parcelas/:parcelaId', async (req, res) => {
   try {
@@ -688,7 +748,7 @@ router.put('/parcelas/:parcelaId', async (req, res) => {
       });
     }
 
-    // Buscar parcela
+    // Buscar parcela atual
     const rows = await query(
       'SELECT * FROM vendas_parcelas WHERE id = ? LIMIT 1',
       [parcelaId]
@@ -697,6 +757,8 @@ router.put('/parcelas/:parcelaId', async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ message: 'Parcela não encontrada' });
     }
+
+    const parcelaAtual = rows[0];
 
     // Preparar dados a atualizar
     const campos = [];
@@ -722,11 +784,32 @@ router.put('/parcelas/:parcelaId', async (req, res) => {
 
     // Atualizar parcela
     await query(
-      `UPDATE vendas_parcelas 
-       SET ${campos.join(', ')} 
+      `UPDATE vendas_parcelas
+       SET ${campos.join(', ')}
        WHERE id = ?`,
       valores
     );
+
+    // ─── Regime de Caixa: inserir lançamento financeiro ao dar baixa ────────────
+    if (status === 'pago' && parcelaAtual.status !== 'pago') {
+      try {
+        const dataPagto    = data_pagamento || new Date().toISOString().split('T')[0];
+        const descricaoPag = `Parcela ${parcelaAtual.numero_parcela} recebida` +
+          (parcelaAtual.client_id ? ` — cliente ID ${parcelaAtual.client_id}` : '');
+        const financId = uuidv4();
+
+        await query(
+          `INSERT INTO financeiro
+             (id, data, categoria, tipo, valor, descricao, created_at, updated_at)
+           VALUES (?, ?, 'Parcela Venda', 'Entrada', ?, ?, NOW(), NOW())`,
+          [financId, dataPagto, parcelaAtual.valor, descricaoPag]
+        );
+      } catch (finErr) {
+        // Não bloqueia a operação principal se o lançamento falhar
+        console.error('[parcelas] Falha ao inserir lançamento financeiro:', finErr?.message);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────
 
     // Retornar parcela atualizada
     const updatedRows = await query(
@@ -745,6 +828,82 @@ router.put('/parcelas/:parcelaId', async (req, res) => {
       message: 'Erro ao atualizar parcela',
       error: error.message
     });
+  }
+});
+
+
+/**
+ * GET /api/contracts/:vendaId/parcelas
+ * Retorna todas as parcelas de uma venda específica (pelo contrato_id = vendaId).
+ * Usado pelo modal de detalhes em VendasCarros.tsx.
+ */
+router.get('/:vendaId/parcelas', async (req, res) => {
+  try {
+    const { vendaId } = req.params;
+    const rows = await query(
+      `SELECT
+         vp.id,
+         vp.numero_parcela,
+         vp.valor,
+         vp.data_vencimento,
+         vp.status,
+         vp.data_pagamento,
+         vp.observacoes
+       FROM vendas_parcelas vp
+       WHERE vp.contrato_id = ?
+       ORDER BY vp.numero_parcela ASC`,
+      [vendaId]
+    );
+    return res.json(rows || []);
+  } catch (error) {
+    console.error('Erro ao buscar parcelas da venda:', error);
+    return res.status(500).json({ message: 'Erro ao buscar parcelas', error: error.message });
+  }
+});
+
+/**
+ * GET /api/parcelas/mes/:ano/:mes
+ * Retorna todas as parcelas com vencimento no mês/ano informado,
+ * enriquecidas com nome e telefone do cliente.
+ * Usado pelo painel mensal de Parcelas a Vencer.
+ */
+router.get('/parcelas/mes/:ano/:mes', async (req, res) => {
+  try {
+    const ano = parseInt(req.params.ano, 10);
+    const mes = parseInt(req.params.mes, 10);
+
+    if (isNaN(ano) || isNaN(mes) || mes < 1 || mes > 12) {
+      return res.status(400).json({ message: 'Ano e mês inválidos.' });
+    }
+
+    // Monta intervalo do mês: primeiro e último dia
+    const inicio = `${ano}-${String(mes).padStart(2, '0')}-01`;
+    const fim    = new Date(ano, mes, 0).toISOString().split('T')[0]; // último dia do mês
+
+    const rows = await query(
+      `SELECT
+         vp.id,
+         vp.contrato_id,
+         vp.client_id,
+         vp.numero_parcela,
+         vp.valor,
+         vp.data_vencimento,
+         vp.status,
+         vp.data_pagamento,
+         vp.observacoes,
+         COALESCE(c.nome, vp.observacoes, 'Cliente') AS cliente_nome,
+         c.telefone                                   AS cliente_telefone
+       FROM vendas_parcelas vp
+       LEFT JOIN clientes c ON c.id = vp.client_id
+       WHERE vp.data_vencimento BETWEEN ? AND ?
+       ORDER BY vp.data_vencimento ASC, c.nome ASC`,
+      [inicio, fim]
+    );
+
+    return res.json(rows || []);
+  } catch (error) {
+    console.error('Erro ao buscar parcelas do mês:', error);
+    return res.status(500).json({ message: 'Erro ao buscar parcelas do mês', error: error.message });
   }
 });
 

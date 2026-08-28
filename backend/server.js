@@ -692,7 +692,7 @@ app.post('/api/auth/login', safeRoute(async (req, res) => {
   // Auto-upgrade de hash legado para sha256
   if (user.senhaHash && !user.senhaHash.startsWith('sha256:')) {
     const newHash = upgradePasswordHash(senha);
-    await query('UPDATE usuarios SET senhaHash = ? WHERE id = ?', [newHash, user.id]).catch(() => {});
+    await query('UPDATE usuarios SET senhaHash = ? WHERE id = ?', [newHash, user.id]).catch(() => { });
   }
 
   req.session.user = {
@@ -881,7 +881,7 @@ app.get('/api/documentos/:entityType/:entityId', safeRoute(async (req, res) => {
 app.post('/api/vendas_carros', safeRoute(async (req, res) => {
   const entityDef = ENTITY_ROUTES.vendas_carros;
   const dbPayload = toDbPayload(entityDef, req.body || {});
-  
+
   if (!dbPayload[entityDef.idColumn]) {
     dbPayload[entityDef.idColumn] = generateId(entityDef.idPrefix);
   }
@@ -1264,17 +1264,17 @@ function montarHtmlEmailSemanal(parcelas, idioma, nomeEmpresa) {
   const linhas = parcelas.length === 0
     ? `<tr><td colspan="4" style="text-align:center;padding:20px;color:#555">${tx.semContas}</td></tr>`
     : parcelas.map(p => {
-        const venc = p.data_vencimento
-          ? new Date(p.data_vencimento).toLocaleDateString('ja-JP')
-          : '—';
-        return `
+      const venc = p.data_vencimento
+        ? new Date(p.data_vencimento).toLocaleDateString('ja-JP')
+        : '—';
+      return `
           <tr>
             <td style="padding:8px 12px;border-bottom:1px solid #eee">${p.cliente_nome || '—'}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${p.numero_parcela || '—'}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${formatJpy(p.valor)}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${venc}</td>
           </tr>`;
-      }).join('');
+    }).join('');
 
   return `
     <!DOCTYPE html>

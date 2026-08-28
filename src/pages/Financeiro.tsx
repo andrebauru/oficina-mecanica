@@ -104,10 +104,13 @@ const Financeiro = () => {
 
   /* ── Parcelas state ── */
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
-  const [parcelasFiltradas, setParcelasFiltradas] = useState<Parcela[]>([]);
   const [parcelasLoading, setParcelasLoading] = useState(false);
   const [parcelaFiltro, setParcelaFiltro] = useState('');
   const [confirmBaixaId, setConfirmBaixaId] = useState<string | null>(null);
+  // Mês selecionado no painel de parcelas (formato YYYY-MM para input type="month")
+  const [mesSelecionado, setMesSelecionado] = useState<string>(
+    new Date().toISOString().slice(0, 7) // ex: '2026-08'
+  );
 
   /* ─── Fetch ─── */
   const fetchLancamentos = async () => {
@@ -130,26 +133,21 @@ const Financeiro = () => {
 
   useEffect(() => { fetchLancamentos(); fetchCategorias(); fetchParcelas(); }, []);
 
-  /* ─── Fetch Parcelas ─── */
-  const fetchParcelas = async () => {
+  /* ─── Fetch Parcelas do Mês ─── */
+  const fetchParcelas = async (mes?: string) => {
+    const alvo = mes || mesSelecionado;
+    if (!alvo) return;
+    const [ano, mesNum] = alvo.split('-');
     setParcelasLoading(true);
     try {
-      const { data } = await axios.get('/api/parcelas');
-      setParcelas(data);
-      setParcelasFiltradas(data);
-    } catch { /* silently fail if table doesn't exist yet */ }
+      const { data } = await axios.get(`/api/parcelas/mes/${ano}/${parseInt(mesNum, 10)}`);
+      setParcelas(Array.isArray(data) ? data : []);
+    } catch { /* silently fail se a tabela ainda não existir */ }
     finally { setParcelasLoading(false); }
   };
 
-  useEffect(() => {
-    if (!parcelaFiltro) { setParcelasFiltradas(parcelas); return; }
-    const t = parcelaFiltro.toLowerCase();
-    setParcelasFiltradas(parcelas.filter(p =>
-      p.cliente_nome?.toLowerCase().includes(t) ||
-      String(p.numero_parcela).includes(t) ||
-      p.status?.toLowerCase().includes(t)
-    ));
-  }, [parcelas, parcelaFiltro]);
+  // Re-busca ao trocar de mês
+  useEffect(() => { fetchParcelas(mesSelecionado); }, [mesSelecionado]);
 
   /* ─── Filtro + Ordenação de Lançamentos ─── */
   useEffect(() => {
@@ -199,9 +197,16 @@ const Financeiro = () => {
   /* ─── Parcelas: Dar Baixa ─── */
   const handleDarBaixa = async (parcelaId: string) => {
     try {
-      const { data } = await axios.put(`/api/financeiro/parcelas/${parcelaId}/pay`);
-      setParcelas(prev => prev.map(p => p.id === parcelaId ? { ...p, ...data } : p));
-      showMsg('Baixa registrada com sucesso!');
+      const hoje = new Date().toISOString().split('T')[0];
+      await axios.put(`/api/parcelas/${parcelaId}`, {
+        status: 'pago',
+        data_pagamento: hoje,
+      });
+      // Atualiza localmente sem re-fetch completo
+      setParcelas(prev => prev.map(p =>
+        p.id === parcelaId ? { ...p, status: 'pago', data_pagamento: hoje } : p
+      ));
+      showMsg('Baixa registrada! Lançamento financeiro criado automaticamente.');
     } catch {
       showMsg('Erro ao registrar baixa', 'error');
     } finally {
@@ -547,19 +552,60 @@ const Financeiro = () => {
         </DialogActions>
       </Dialog>
 
-      {/* ══════════ TAB 2 — PARCELAS ══════════ */}
+      {/* ══════════ TAB 2 — PARCELAS A VENCER ══════════ */}
       <TabPanel value={tab} index={2}>
+        {/* Header: título + seletor de mês + filtro de texto */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-          <Typography variant="h6">Parcelas de Financiamento</Typography>
-          <TextField
-            size="small"
-            placeholder="Buscar por cliente, parcela ou status..."
-            value={parcelaFiltro}
-            onChange={e => setParcelaFiltro(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-            sx={{ minWidth: 260 }}
-          />
+          <Typography variant="h6">Parcelas a Vencer</Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Seletor de Mês/Ano */}
+            <TextField
+              size="small"
+              type="month"
+              label="Mês de Referência"
+              value={mesSelecionado}
+              onChange={e => setMesSelecionado(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ minWidth: 180 }}
+            />
+            {/* Filtro de texto */}
+            <TextField
+              size="small"
+              placeholder="Buscar por cliente ou status..."
+              value={parcelaFiltro}
+              onChange={e => setParcelaFiltro(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+              sx={{ minWidth: 240 }}
+            />
+          </Box>
         </Box>
+
+        {/* Totalizadores do mês */}
+        {(() => {
+          const filtradas = parcelas.filter(p =>
+            !parcelaFiltro ||
+            p.cliente_nome?.toLowerCase().includes(parcelaFiltro.toLowerCase()) ||
+            p.status?.toLowerCase().includes(parcelaFiltro.toLowerCase())
+          );
+          const totalPago     = filtradas.filter(p => p.status === 'pago').reduce((s, p) => s + Number(p.valor), 0);
+          const totalPendente = filtradas.filter(p => p.status !== 'pago').reduce((s, p) => s + Number(p.valor), 0);
+          return (
+            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ px: 2, py: 1, borderRadius: 1, backgroundColor: '#e8f5e9', textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">✓ Recebido no mês</Typography>
+                <Typography fontWeight="bold" color="success.main">{formatCurrency(totalPago)}</Typography>
+              </Box>
+              <Box sx={{ px: 2, py: 1, borderRadius: 1, backgroundColor: '#fff3e0', textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">⏳ Pendente no mês</Typography>
+                <Typography fontWeight="bold" color="warning.main">{formatCurrency(totalPendente)}</Typography>
+              </Box>
+              <Box sx={{ px: 2, py: 1, borderRadius: 1, backgroundColor: '#e3f2fd', textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">Total de parcelas</Typography>
+                <Typography fontWeight="bold">{filtradas.length}</Typography>
+              </Box>
+            </Box>
+          );
+        })()}
 
         {parcelasLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
@@ -578,58 +624,59 @@ const Financeiro = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {parcelasFiltradas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                        Nenhuma parcela encontrada.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : parcelasFiltradas.map(p => (
-                  <TableRow key={p.id} hover sx={{ backgroundColor: p.status === 'pago' ? '#f1f8e9' : 'inherit' }}>
-                    <TableCell>{p.cliente_nome || '—'}</TableCell>
-                    <TableCell align="center">{p.numero_parcela}</TableCell>
-                    <TableCell align="right">{formatCurrency(p.valor)}</TableCell>
-                    <TableCell align="center">
-                      {p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR') : '—'}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={p.status === 'pago' ? 'Pago' : 'Pendente'}
-                        color={p.status === 'pago' ? 'success' : 'warning'}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      {p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '—'}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                {(() => {
+                  const filtradas = parcelas.filter(p =>
+                    !parcelaFiltro ||
+                    p.cliente_nome?.toLowerCase().includes(parcelaFiltro.toLowerCase()) ||
+                    p.status?.toLowerCase().includes(parcelaFiltro.toLowerCase())
+                  );
+                  if (filtradas.length === 0) return (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                          Nenhuma parcela encontrada para {mesSelecionado}.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                  return filtradas.map(p => (
+                    <TableRow key={p.id} hover sx={{ backgroundColor: p.status === 'pago' ? '#f1f8e9' : 'inherit' }}>
+                      <TableCell>{p.cliente_nome || '—'}</TableCell>
+                      <TableCell align="center">{p.numero_parcela}</TableCell>
+                      <TableCell align="right">{formatCurrency(p.valor)}</TableCell>
+                      <TableCell align="center">
+                        {p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR') : '—'}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={p.status === 'pago' ? 'Pago' : 'Pendente'}
+                          color={p.status === 'pago' ? 'success' : 'warning'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        {p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '—'}
+                      </TableCell>
+                      <TableCell align="center">
                         {p.status !== 'pago' && (
-                          <IconButton
+                          <Button
                             size="small"
+                            variant="contained"
                             color="success"
-                            title="Dar Baixa"
+                            startIcon={<CheckCircleIcon />}
                             onClick={() => setConfirmBaixaId(p.id)}
+                            sx={{ textTransform: 'none', fontWeight: 600, fontSize: 12 }}
                           >
-                            <CheckCircleIcon />
-                          </IconButton>
+                            Dar Baixa
+                          </Button>
                         )}
                         {p.status === 'pago' && (
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            title="Imprimir Recibo"
-                            onClick={() => handleImprimirRecibo(p.id)}
-                          >
-                            <PrintIcon />
-                          </IconButton>
+                          <Chip label="✓ Quitado" color="success" variant="outlined" size="small" />
                         )}
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                    </TableRow>
+                  ));
+                })()}
               </TableBody>
             </Table>
           </TableContainer>
