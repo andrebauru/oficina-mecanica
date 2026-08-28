@@ -569,6 +569,7 @@ function registerEntityRoutes(resource, entityDef) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const app = express();
+app.set('trust proxy', 1);
 
 function safeRoute(handler) {
   return async (req, res, next) => {
