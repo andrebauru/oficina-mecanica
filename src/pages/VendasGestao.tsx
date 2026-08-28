@@ -152,35 +152,36 @@ export const VendasGestao: React.FC = () => {
     return calcularResumoRecebivel(parcelas);
   }, [parcelas]);
 
-  // Agrupar parcelas por venda
+  // Agrupar parcelas por venda e incluir todas as vendas ativas
   const vendasAgrupadas = useMemo((): VendaResumo[] => {
-    // Agrupar parcelas por vendaId
     const grupos: Record<string, Parcela[]> = {};
     parcelas.forEach(p => {
       if (!grupos[p.vendaId]) grupos[p.vendaId] = [];
       grupos[p.vendaId].push(p);
     });
 
-    const resultado: VendaResumo[] = Object.entries(grupos).map(([vendaId, parcelasVenda]) => {
+    const resultado: VendaResumo[] = vendas.map(venda => {
+      const parcelasVenda = grupos[venda.id] || [];
       parcelasVenda.sort((a, b) => a.numeroParcela - b.numeroParcela);
       const primeiraP = parcelasVenda[0];
-      const totalParcelas = parcelasVenda.length;
+      const totalParcelas = parcelasVenda.length || Number(venda.numeroParcelas || 1);
       const parcelasPagas = parcelasVenda.filter(p => p.status === 'pago').length;
       const restantes = parcelasVenda.filter(p => p.status !== 'pago');
 
-      // Status geral
       let statusGeral: StatusParcela = 'pago';
-      if (restantes.length > 0) {
+      if (venda.statusVenda === 'cancelado') {
+        statusGeral = 'devolvido';
+      } else if (restantes.length > 0) {
         const temAtrasada = restantes.some(p => atualizarStatusParcela(p) === 'atrasado');
         statusGeral = temAtrasada ? 'atrasado' : 'pendente';
+      } else if (parcelasVenda.length === 0) {
+        statusGeral = venda.valorPago && venda.valorPago >= venda.valorTotal ? 'pago' : 'pendente';
       }
 
-      // Próximo vencimento (primeira não paga)
       const proximoVencimento = restantes.length > 0
         ? restantes.sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))[0].dataVencimento
-        : parcelasVenda[parcelasVenda.length - 1].dataVencimento;
+        : (parcelasVenda.length > 0 ? parcelasVenda[parcelasVenda.length - 1].dataVencimento : String(venda.dataVenda || '').slice(0, 10));
 
-      // Descrição de parcelas
       let descricaoParcelas = '';
       if (totalParcelas === 1) {
         descricaoParcelas = statusGeral === 'pago' ? '✓ À Vista — Pago' : '◷ À Vista — Pendente';
@@ -194,10 +195,10 @@ export const VendasGestao: React.FC = () => {
       }
 
       return {
-        vendaId,
-        clienteNome: primeiraP.clienteNome,
-        clienteTelefone: primeiraP.clienteTelefone,
-        valorTotal: parcelasVenda.reduce((s, p) => s + p.valor, 0),
+        vendaId: venda.id,
+        clienteNome: venda.clienteNomeSnapshot || primeiraP?.clienteNome || 'Cliente',
+        clienteTelefone: venda.clienteTelefoneSnapshot || primeiraP?.clienteTelefone || '',
+        valorTotal: Number(venda.valorTotal || (parcelasVenda.reduce((s, p) => s + p.valor, 0)) || 0),
         proximoVencimento,
         statusGeral,
         descricaoParcelas,
@@ -231,7 +232,7 @@ export const VendasGestao: React.FC = () => {
     });
 
     return filtrado;
-  }, [parcelas, filtroStatus, searchTerm, sortBy, sortDir]);
+  }, [vendas, parcelas, filtroStatus, searchTerm, sortBy, sortDir]);
 
   // Cores por status
   const getCorStatus = (status: StatusParcela) => {

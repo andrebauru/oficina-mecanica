@@ -38,6 +38,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import ArticleIcon from '@mui/icons-material/Article';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CancelIcon from '@mui/icons-material/Cancel';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PrintIcon from '@mui/icons-material/Print';
 import { Tooltip } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatters';
@@ -663,16 +665,46 @@ const VendasCarros = () => {
   };
 
   const handleToggleParcela = async (venda: VendaCarro, index: number) => {
-    const parcCount = venda.parcelas ?? 1;
-    const current = venda.parcelasStatus ?? Array(parcCount).fill(false);
-    const updated = [...current];
-    updated[index] = !updated[index];
     try {
-      await axios.patch(`/api/vendas_carros/${venda.id}`, { parcelasStatus: updated });
-      fetchVendasCarros();
+      await axios.post(`/api/vendas_carros/${venda.id}/parcelas/${index + 1}/toggle`);
+      await fetchVendasCarros();
+      setSnackbar({
+        open: true,
+        message: `Status da ${index + 1}ª parcela atualizado com sucesso!`,
+        severity: 'success'
+      });
     } catch {
-      setSnackbar({ open: true, message: 'Erro ao atualizar pagamento', severity: 'error' });
+      // Fallback
+      const parcCount = venda.parcelas ?? 1;
+      const current = venda.parcelasStatus ?? Array(parcCount).fill(false);
+      const updated = [...current];
+      updated[index] = !updated[index];
+      try {
+        await axios.patch(`/api/vendas_carros/${venda.id}`, { parcelasStatus: updated });
+        fetchVendasCarros();
+      } catch {
+        setSnackbar({ open: true, message: 'Erro ao atualizar pagamento da parcela', severity: 'error' });
+      }
     }
+  };
+
+  const handleDarBaixaParcelaModal = async (parcelaId: string) => {
+    try {
+      await axios.put(`/api/financeiro/parcelas/${parcelaId}/pay`);
+      if (parcelasModalVendaId) {
+        const parcRes = await axios.get(`/api/documentos/venda/${parcelasModalVendaId}/parcelas`).catch(() => ({ data: [] }));
+        setParcelasModalData(parcRes.data || []);
+      }
+      await fetchVendasCarros();
+      setSnackbar({ open: true, message: 'Baixa efetuada com sucesso e lançada no livro caixa!', severity: 'success' });
+    } catch (err) {
+      console.error('Erro ao dar baixa:', err);
+      setSnackbar({ open: true, message: 'Erro ao dar baixa na parcela', severity: 'error' });
+    }
+  };
+
+  const handleImprimirReciboParcela = (parcelaId: string) => {
+    window.open(`/api/financeiro/parcelas/${parcelaId}/recibo`, '_blank');
   };
 
   useEffect(() => {
@@ -1341,12 +1373,13 @@ const VendasCarros = () => {
                       <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="right">Valor</TableCell>
                       <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Status</TableCell>
                       <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Pagamento</TableCell>
+                      <TableCell sx={{ color: '#fff', fontWeight: 'bold' }} align="center">Ações</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {parcelasModalData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} align="center">
+                        <TableCell colSpan={6} align="center">
                           <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
                             Nenhuma parcela registrada para esta venda. Gere o contrato com carnê para criar as parcelas.
                           </Typography>
@@ -1364,7 +1397,7 @@ const VendasCarros = () => {
                         <TableCell align="right">{formatCurrency(p.valor)}</TableCell>
                         <TableCell align="center">
                           <Chip
-                            label={p.status === 'pago' ? '✓ Pago' : 'Pendente'}
+                            label={p.status === 'pago' ? '✓ Pago' : '⏳ Pendente'}
                             color={p.status === 'pago' ? 'success' : 'warning'}
                             size="small"
                           />
@@ -1373,6 +1406,30 @@ const VendasCarros = () => {
                           {p.data_pagamento
                             ? new Date(p.data_pagamento).toLocaleDateString('pt-BR')
                             : '—'}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                            {p.status !== 'pago' && (
+                              <Tooltip title="Dar Baixa (Registrar Pagamento)">
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  onClick={() => handleDarBaixaParcelaModal(p.id)}
+                                >
+                                  <CheckCircleIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            <Tooltip title="Imprimir Recibo">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleImprimirReciboParcela(p.id)}
+                              >
+                                <PrintIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))}

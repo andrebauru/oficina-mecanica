@@ -53,6 +53,8 @@ interface VendaCarro {
   kilometragem: number;
   parcelas?: number;
   valorTotal?: number;
+  valorPago?: number;
+  status?: string;
   parcelasStatus?: boolean[];
 }
 
@@ -313,15 +315,31 @@ const Dashboard = () => {
 
   let aReceberVC = 0; let jaRecebidoVC = 0;
   vendasCarros.forEach(venda => {
-    const vt = venda.valorTotal ?? venda.valor;
-    if (venda.parcelasStatus && venda.parcelasStatus.length > 0) {
-      const parcCount = venda.parcelas ?? 1;
-      const valorParcela = vt / parcCount;
+    if (venda.status === 'cancelado') return;
+
+    const valorSinal = Number(venda.valorPago || 0);
+    const valorTotal = Number(venda.valorTotal || venda.valor || 0);
+    const valorFinanciado = Math.max(0, valorTotal - valorSinal);
+
+    // Regime de Caixa: Entrada/Sinal sempre entra como já recebido
+    jaRecebidoVC += valorSinal;
+
+    const parcCount = Number(venda.parcelas || 1);
+    if (parcCount > 1 && venda.parcelasStatus && venda.parcelasStatus.length > 0) {
+      const valorParcela = valorFinanciado > 0 ? valorFinanciado / parcCount : 0;
       venda.parcelasStatus.forEach(pago => {
-        if (pago) jaRecebidoVC += valorParcela; else aReceberVC += valorParcela;
+        if (pago) jaRecebidoVC += valorParcela;
+        else aReceberVC += valorParcela;
       });
+    } else if (parcCount > 1) {
+      // Parcelas futuras pendentes entram em A Receber
+      aReceberVC += valorFinanciado;
     } else {
-      jaRecebidoVC += vt;
+      // À vista: saldo restante se não quitado integralmente no sinal
+      const saldo = Math.max(0, valorTotal - valorSinal);
+      if (saldo > 0) {
+        aReceberVC += saldo;
+      }
     }
   });
 

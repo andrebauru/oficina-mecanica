@@ -1311,15 +1311,45 @@ app.get('/api/financeiro/parcelas/:id/recibo', safeRoute(async (req, res) => {
 }));
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── Dashboard financeiro do mês atual ───────────────────────────────────────
+// ─── Dashboard financeiro do mês atual (Regime de Caixa) ─────────────────────
 app.get('/api/financeiro/dashboard/mes', safeRoute(async (_req, res) => {
-  let totalRecebidoParcelas = 0;
-  let totalPendenteParcelas = 0;
+  let totalRecebidoSinais = 0;
   let totalRecebidoVendasParc = 0;
+  let totalRecebidoParcelas = 0;
   let totalPendenteVendasParc = 0;
+  let totalPendenteParcelas = 0;
   let proximasContas = [];
 
-  // Consulta tabela parcelas (vinculada a vendas)
+  // 1. Sinais / Entradas de vendas recebidos no mês atual (vendas_carros)
+  try {
+    const rowsSinais = await query(
+      `SELECT SUM(COALESCE(valor_pago, 0)) AS totalSinais
+       FROM vendas_carros
+       WHERE status != 'cancelado'
+         AND MONTH(created_at) = MONTH(CURRENT_DATE())
+         AND YEAR(created_at) = YEAR(CURRENT_DATE())`
+    );
+    totalRecebidoSinais = Number(rowsSinais[0]?.totalSinais || 0);
+  } catch { /* continuar */ }
+
+  // 2. Parcelas pagas e a receber no mês atual (vendas_parcelas)
+  try {
+    const rowsVendasParc = await query(
+      `SELECT
+         SUM(CASE WHEN status = 'pago' THEN valor ELSE 0 END) AS totalRecebido,
+         SUM(CASE WHEN status != 'pago' THEN valor ELSE 0 END) AS totalPendente
+       FROM vendas_parcelas
+       WHERE (
+         (status = 'pago' AND MONTH(COALESCE(data_pagamento, data_vencimento)) = MONTH(CURRENT_DATE()) AND YEAR(COALESCE(data_pagamento, data_vencimento)) = YEAR(CURRENT_DATE()))
+         OR
+         (status != 'pago' AND MONTH(data_vencimento) = MONTH(CURRENT_DATE()) AND YEAR(data_vencimento) = YEAR(CURRENT_DATE()))
+       )`
+    );
+    totalRecebidoVendasParc = Number(rowsVendasParc[0]?.totalRecebido || 0);
+    totalPendenteVendasParc = Number(rowsVendasParc[0]?.totalPendente || 0);
+  } catch { /* continuar */ }
+
+  // 3. Parcelas da tabela legada parcelas (se houver)
   try {
     const rowsParcelas = await query(
       `SELECT
@@ -1331,54 +1361,36 @@ app.get('/api/financeiro/dashboard/mes', safeRoute(async (_req, res) => {
     );
     totalRecebidoParcelas = Number(rowsParcelas[0]?.totalRecebido || 0);
     totalPendenteParcelas = Number(rowsParcelas[0]?.totalPendente || 0);
-  } catch {
-    // tabela pode não existir em todos os ambientes
-  }
+  } catch { /* continuar */ }
 
-  // Consulta tabela vendas_parcelas (vinculada a contratos de clientes)
+  // 4. Próximas contas a receber com dados reais do cliente
   try {
-    const rowsVendasParc = await query(
-      `SELECT
-         SUM(CASE WHEN status = 'pago' THEN valor ELSE 0 END) AS totalRecebido,
-         SUM(CASE WHEN status != 'pago' THEN valor ELSE 0 END) AS totalPendente
-       FROM vendas_parcelas
-       WHERE MONTH(data_vencimento) = MONTH(CURRENT_DATE())
-         AND YEAR(data_vencimento) = YEAR(CURRENT_DATE())`
-    );
-    totalRecebidoVendasParc = Number(rowsVendasParc[0]?.totalRecebido || 0);
-    totalPendenteVendasParc = Number(rowsVendasParc[0]?.totalPendente || 0);
-  } catch {
-    // tabela pode não existir em todos os ambientes
-  }
-
-  // Próximas 5 contas a receber (de parcelas + vendas_parcelas combinadas)
-  try {
-    const [nextParcelas, nextVendasParc] = await Promise.all([
+    const [nextVendasParc, nextParcelas] = await Promise.all([
+      query(
+        `SELECT vp.id, COALESCE(c.nome, vp.observacoes, vc.cliente_nome, 'Cliente') AS clienteNome,
+                vp.data_vencimento AS dataVencimento, vp.valor, vp.status
+         FROM vendas_parcelas vp
+         LEFT JOIN clientes c ON vp.client_id = c.id
+         LEFT JOIN vendas_carros vc ON vp.contrato_id = vc.id
+         WHERE vp.status != 'pago' AND vp.data_vencimento >= CURRENT_DATE()
+         ORDER BY vp.data_vencimento ASC LIMIT 5`
+      ).catch(() => []),
       query(
         `SELECT p.id, p.cliente_nome AS clienteNome, p.data_vencimento AS dataVencimento, p.valor, p.status
          FROM parcelas p
          WHERE p.status != 'pago' AND p.data_vencimento >= CURRENT_DATE()
          ORDER BY p.data_vencimento ASC LIMIT 5`
       ).catch(() => []),
-      query(
-        `SELECT vp.id, c.nome AS clienteNome, vp.data_vencimento AS dataVencimento, vp.valor, vp.status
-         FROM vendas_parcelas vp
-         JOIN clientes c ON vp.client_id = c.id
-         WHERE vp.status != 'pago' AND vp.data_vencimento >= CURRENT_DATE()
-         ORDER BY vp.data_vencimento ASC LIMIT 5`
-      ).catch(() => []),
     ]);
 
-    proximasContas = [...nextParcelas, ...nextVendasParc]
+    proximasContas = [...nextVendasParc, ...nextParcelas]
       .sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime())
       .slice(0, 5);
-  } catch {
-    // sem dados disponíveis
-  }
+  } catch { /* continuar */ }
 
   return res.json({
-    totalRecebido: totalRecebidoParcelas + totalRecebidoVendasParc,
-    totalPendente: totalPendenteParcelas + totalPendenteVendasParc,
+    totalRecebido: totalRecebidoSinais + totalRecebidoVendasParc + totalRecebidoParcelas,
+    totalPendente: totalPendenteVendasParc + totalPendenteParcelas,
     proximasContas,
   });
 }));
@@ -1679,18 +1691,36 @@ app.get('/api/calendario/vencimentos', safeRoute(async (req, res) => {
 
 // =============================================================================
 // ROTA: PUT /api/calendario/parcelas/:id/baixa?origem=parcelas|vendas_parcelas
-// Marca a parcela como paga — funciona para ambas as tabelas
+// Marca a parcela como paga — funciona para ambas as tabelas e registra no financeiro
 app.put('/api/calendario/parcelas/:id/baixa', safeRoute(async (req, res) => {
   const { id } = req.params;
   const origem = req.query.origem === 'vendas_parcelas' ? 'vendas_parcelas' : 'parcelas';
+  const hoje = new Date().toISOString().split('T')[0];
 
-  const rows = await query(`SELECT id FROM ${origem} WHERE id = ? LIMIT 1`, [id]);
+  const rows = await query(`SELECT * FROM ${origem} WHERE id = ? LIMIT 1`, [id]);
   if (!rows.length) return res.status(404).json({ message: 'Parcela não encontrada' });
+  const parcela = rows[0];
 
   await query(
-    `UPDATE ${origem} SET status = 'pago', data_pagamento = CURRENT_DATE() WHERE id = ?`,
-    [id]
+    `UPDATE ${origem} SET status = 'pago', data_pagamento = ? WHERE id = ?`,
+    [hoje, id]
   );
+
+  // Registrar no financeiro (Regime de Caixa) se não estava paga
+  if (parcela.status !== 'pago') {
+    try {
+      const financId = `fin_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const desc = `Parcela ${parcela.numero_parcela || ''} recebida via Calendário` +
+        (parcela.client_id ? ` — cliente ID ${parcela.client_id}` : '');
+      await query(
+        `INSERT INTO financeiro (id, data, categoria, tipo, valor, descricao, created_at, updated_at)
+         VALUES (?, ?, 'Parcela Venda', 'Entrada', ?, ?, NOW(), NOW())`,
+        [financId, hoje, parcela.valor, desc]
+      );
+    } catch (finErr) {
+      console.error('[calendario:baixa] Falha ao registrar no financeiro:', finErr?.message);
+    }
+  }
 
   const updated = await query(`SELECT * FROM ${origem} WHERE id = ? LIMIT 1`, [id]);
   return res.json({ ok: true, parcela: updated[0] });
@@ -1796,15 +1826,219 @@ app.post('/api/sendgrid/testar-chave', safeRoute(async (req, res) => {
 }));
 
 // =============================================================================
+// ROTAS CUSTOMIZADAS UNIFICADAS: VENDAS, PARCELAS E GESTÃO
+// =============================================================================
+
+// GET /api/vendas — Listagem unificada com JOIN entre vendas_carros, clientes e veiculos
+app.get('/api/vendas', safeRoute(async (_req, res) => {
+  try {
+    const rows = await query(
+      `SELECT 
+         vc.id,
+         COALESCE(vc.cliente_id, '') AS clienteId,
+         COALESCE(vc.veiculo_id, '') AS veiculoId,
+         COALESCE(c.nome, vc.cliente_nome, 'Cliente') AS clienteNomeSnapshot,
+         COALESCE(c.telefone, vc.cliente_telefone, '') AS clienteTelefoneSnapshot,
+         COALESCE(c.endereco, vc.cliente_endereco, '') AS clienteEnderecoSnapshot,
+         COALESCE(vc.created_at, NOW()) AS dataVenda,
+         COALESCE(vc.valor_total, vc.valor, 0) AS valorTotal,
+         COALESCE(vc.valor_pago, 0) AS valorPago,
+         CASE WHEN COALESCE(vc.parcelas, 1) > 1 THEN 'parcelado' ELSE 'vista' END AS tipoVenda,
+         COALESCE(vc.parcelas, 1) AS numeroParcelas,
+         COALESCE(vc.juros, 0) AS juros,
+         CASE WHEN vc.status = 'cancelado' THEN 'cancelado' ELSE 'ativo' END AS statusVenda,
+         'Tsu' AS foroPagamento,
+         COALESCE(vc.contratoPath, '') AS nomeContrato,
+         COALESCE(vc.placa, '') AS placa,
+         COALESCE(vc.chassi, '') AS chassi,
+         COALESCE(vc.recibo_pdf, '') AS reciboPDF,
+         vc.recibo_gerado_em AS reciboGeradoEm,
+         CONCAT(COALESCE(vc.fabricante, ''), ' ', COALESCE(vc.modelo, ''), ' (', COALESCE(vc.ano, ''), ')') AS observacoes
+       FROM vendas_carros vc
+       LEFT JOIN clientes c ON vc.cliente_id = c.id
+       ORDER BY vc.created_at DESC`
+    );
+    if (rows && rows.length > 0) {
+      return res.json(rows);
+    }
+  } catch (err) {
+    console.warn('[GET /api/vendas] Tentando fallback para tabela legada:', err.message);
+  }
+  const legRows = await query('SELECT * FROM vendas ORDER BY created_at DESC').catch(() => []);
+  return res.json(legRows.map(r => parseDbRow(ENTITY_ROUTES.vendas, r)));
+}));
+
+// GET /api/parcelas — Listagem unificada com JOIN entre vendas_parcelas e clientes
+app.get('/api/parcelas', safeRoute(async (_req, res) => {
+  try {
+    const rows = await query(
+      `SELECT 
+         vp.id,
+         vp.contrato_id AS vendaId,
+         vp.numero_parcela AS numeroParcela,
+         vp.valor,
+         vp.data_vencimento AS dataVencimento,
+         vp.status,
+         vp.data_pagamento AS dataPagamento,
+         COALESCE(c.nome, vp.observacoes, vc.cliente_nome, 'Cliente') AS clienteNome,
+         COALESCE(c.telefone, vc.cliente_telefone, '') AS clienteTelefone
+       FROM vendas_parcelas vp
+       LEFT JOIN clientes c ON vp.client_id = c.id
+       LEFT JOIN vendas_carros vc ON vp.contrato_id = vc.id
+       ORDER BY vp.data_vencimento ASC`
+    );
+    if (rows && rows.length > 0) {
+      return res.json(rows);
+    }
+  } catch (err) {
+    console.warn('[GET /api/parcelas] Tentando fallback para tabela legada:', err.message);
+  }
+  const legRows = await query('SELECT * FROM parcelas ORDER BY data_vencimento ASC').catch(() => []);
+  return res.json(legRows.map(r => parseDbRow(ENTITY_ROUTES.parcelas, r)));
+}));
+
+// PATCH & PUT /api/parcelas/:id — Atualiza parcela e registra no financeiro
+app.patch('/api/parcelas/:id', safeRoute(async (req, res) => {
+  const { id } = req.params;
+  const { status, dataPagamento, valor } = req.body || {};
+  const hoje = new Date().toISOString().split('T')[0];
+  const targetStatus = status || 'pago';
+  const targetDataPagamento = dataPagamento || (targetStatus === 'pago' ? hoje : null);
+
+  let parcela = null;
+  const rowsVendas = await query('SELECT * FROM vendas_parcelas WHERE id = ? LIMIT 1', [id]).catch(() => []);
+  if (rowsVendas.length > 0) {
+    parcela = rowsVendas[0];
+    await query(
+      'UPDATE vendas_parcelas SET status = ?, data_pagamento = ?, updated_at = NOW() WHERE id = ?',
+      [targetStatus, targetDataPagamento, id]
+    );
+  } else {
+    const rowsLeg = await query('SELECT * FROM parcelas WHERE id = ? LIMIT 1', [id]).catch(() => []);
+    if (rowsLeg.length > 0) {
+      parcela = rowsLeg[0];
+      await query(
+        'UPDATE parcelas SET status = ?, data_pagamento = ? WHERE id = ?',
+        [targetStatus, targetDataPagamento, id]
+      );
+    }
+  }
+
+  if (!parcela) return res.status(404).json({ message: 'Parcela não encontrada' });
+
+  // Inserir no financeiro se marcou como pago (Regime de Caixa)
+  if (targetStatus === 'pago' && parcela.status !== 'pago') {
+    try {
+      const financId = `fin_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const val = valor || parcela.valor || 0;
+      const desc = `Parcela ${parcela.numero_parcela || ''} recebida` +
+        (parcela.client_id ? ` — cliente ID ${parcela.client_id}` : '');
+      await query(
+        `INSERT INTO financeiro (id, data, categoria, tipo, valor, descricao, created_at, updated_at)
+         VALUES (?, ?, 'Parcela Venda', 'Entrada', ?, ?, NOW(), NOW())`,
+        [financId, targetDataPagamento || hoje, val, desc]
+      );
+    } catch (finErr) {
+      console.error('[patch parcelas] Erro financeiro:', finErr?.message);
+    }
+  }
+
+  return res.json({ ok: true, id, status: targetStatus, dataPagamento: targetDataPagamento });
+}));
+
+app.put('/api/parcelas/:id', safeRoute(async (req, res) => {
+  req.method = 'PATCH';
+  return app._router.handle(req, res);
+}));
+
+// GET /api/vendas_carros — Sincroniza parcelasStatus em tempo real a partir de vendas_parcelas
+app.get('/api/vendas_carros', safeRoute(async (_req, res) => {
+  const rows = await query('SELECT * FROM vendas_carros ORDER BY id DESC').catch(() => []);
+  const vendasFormatadas = await Promise.all(rows.map(async (row) => {
+    const parsed = parseDbRow(ENTITY_ROUTES.vendas_carros, row);
+    try {
+      const parcRows = await query(
+        'SELECT id, numero_parcela, valor, data_vencimento, status, data_pagamento FROM vendas_parcelas WHERE contrato_id = ? ORDER BY numero_parcela ASC',
+        [row.id]
+      );
+      if (parcRows.length > 0) {
+        const parcCount = Number(parsed.parcelas || parcRows.length);
+        const statusArray = [];
+        for (let i = 1; i <= parcCount; i++) {
+          const p = parcRows.find(item => item.numero_parcela === i);
+          statusArray.push(p ? p.status === 'pago' : false);
+        }
+        parsed.parcelasStatus = statusArray;
+        parsed.parcelas_reais = parcRows;
+      }
+    } catch { /* manter parcelasStatus do JSON */ }
+    return parsed;
+  }));
+  return res.json(vendasFormatadas);
+}));
+
+// POST /api/vendas_carros/:vendaId/parcelas/:numero/toggle — Alterna status da parcela
+app.post('/api/vendas_carros/:vendaId/parcelas/:numero/toggle', safeRoute(async (req, res) => {
+  const { vendaId, numero } = req.params;
+  const numParcela = parseInt(numero, 10);
+  const hoje = new Date().toISOString().split('T')[0];
+
+  const parcRows = await query(
+    'SELECT * FROM vendas_parcelas WHERE contrato_id = ? AND numero_parcela = ? LIMIT 1',
+    [vendaId, numParcela]
+  );
+
+  let novoStatus = 'pago';
+  if (parcRows.length > 0) {
+    const parcela = parcRows[0];
+    novoStatus = parcela.status === 'pago' ? 'pendente' : 'pago';
+    const novaDataPagamento = novoStatus === 'pago' ? hoje : null;
+
+    await query(
+      'UPDATE vendas_parcelas SET status = ?, data_pagamento = ?, updated_at = NOW() WHERE id = ?',
+      [novoStatus, novaDataPagamento, parcela.id]
+    );
+
+    if (novoStatus === 'pago') {
+      try {
+        const financId = `fin_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        const desc = `Parcela ${numParcela} recebida — Venda ${vendaId}`;
+        await query(
+          `INSERT INTO financeiro (id, data, categoria, tipo, valor, descricao, created_at, updated_at)
+           VALUES (?, ?, 'Parcela Venda', 'Entrada', ?, ?, NOW(), NOW())`,
+          [financId, hoje, parcela.valor, desc]
+        );
+      } catch (finErr) {
+        console.error('[toggle parcela] Erro financeiro:', finErr?.message);
+      }
+    }
+  }
+
+  // Atualiza também o JSON na tabela vendas_carros
+  const parcAll = await query(
+    'SELECT numero_parcela, status FROM vendas_parcelas WHERE contrato_id = ? ORDER BY numero_parcela ASC',
+    [vendaId]
+  ).catch(() => []);
+  if (parcAll.length > 0) {
+    const statusArray = parcAll.map(p => p.status === 'pago');
+    await query(
+      'UPDATE vendas_carros SET parcelas_status_json = ?, updated_at = NOW() WHERE id = ?',
+      [JSON.stringify(statusArray), vendaId]
+    ).catch(() => {});
+  }
+
+  return res.json({ ok: true, vendaId, numeroParcela: numParcela, status: novoStatus });
+}));
+
+// =============================================================================
 Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
-  // Pular recursos com rotas POST customizadas
+  // Pular recursos com rotas customizadas
   if (resource === 'vendas_carros') return;
   if (resource === 'documentos') return;
+  if (resource === 'vendas') return;
+  if (resource === 'parcelas') return;
   registerEntityRoutes(resource, entityDef);
 });
-
-// Registrar rota genérica para vendas_carros (GET, PUT, PATCH, DELETE), POST já está customizado
-registerEntityRoutes('vendas_carros', ENTITY_ROUTES.vendas_carros);
 
 // Registrar rotas genéricas para documentos (GET list, GET/:id, PUT, PATCH, DELETE), POST já está customizado
 registerEntityRoutes('documentos', ENTITY_ROUTES.documentos);
