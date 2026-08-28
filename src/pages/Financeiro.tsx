@@ -658,21 +658,31 @@ const Financeiro = () => {
                         {p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '—'}
                       </TableCell>
                       <TableCell align="center">
-                        {p.status !== 'pago' && (
-                          <Button
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', alignItems: 'center' }}>
+                          {p.status !== 'pago' && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              startIcon={<CheckCircleIcon />}
+                              onClick={() => setConfirmBaixaId(p.id)}
+                              sx={{ textTransform: 'none', fontWeight: 600, fontSize: 12 }}
+                            >
+                              Dar Baixa
+                            </Button>
+                          )}
+                          {p.status === 'pago' && (
+                            <Chip label="✓ Quitado" color="success" variant="outlined" size="small" />
+                          )}
+                          <IconButton
                             size="small"
-                            variant="contained"
-                            color="success"
-                            startIcon={<CheckCircleIcon />}
-                            onClick={() => setConfirmBaixaId(p.id)}
-                            sx={{ textTransform: 'none', fontWeight: 600, fontSize: 12 }}
+                            color="primary"
+                            title="Imprimir Recibo"
+                            onClick={() => handleImprimirRecibo(p.id)}
                           >
-                            Dar Baixa
-                          </Button>
-                        )}
-                        {p.status === 'pago' && (
-                          <Chip label="✓ Quitado" color="success" variant="outlined" size="small" />
-                        )}
+                            <PrintIcon />
+                          </IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ));
