@@ -47,9 +47,7 @@ export default function ContratoVendaDialog({
   const [preco, setPreco] = useState<string>('');
   const [sinal, setSinal] = useState<string>('');
   const [parcelas, setParcelas] = useState<string>('1');
-  const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState<string>(
-    new Date().toISOString().split('T')[0] // default = hoje
-  );
+  const [diaVencimento, setDiaVencimento] = useState<string>('10');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [sucesso, setSucesso] = useState(false);
@@ -146,7 +144,7 @@ export default function ContratoVendaDialog({
         pdfBase64: pdfBase64,
         // Campos do carnê de parcelas
         quantidadeParcelas: parcelasNum > 1 ? parcelasNum : 0,
-        dataPrimeiraParcela: parcelasNum > 1 ? dataPrimeiraParcela : null,
+        diaVencimento: parcelasNum > 1 ? parseInt(diaVencimento || '10', 10) : null,
       });
 
 
@@ -175,7 +173,7 @@ export default function ContratoVendaDialog({
     setPreco('');
     setSinal('');
     setParcelas('1');
-    setDataPrimeiraParcela(new Date().toISOString().split('T')[0]);
+    setDiaVencimento('10');
     setError('');
     setSucesso(false);
   };
@@ -267,16 +265,21 @@ export default function ContratoVendaDialog({
           sx={{ mb: 2 }}
         />
 
-        {/* Data da 1ª Parcela — visível apenas quando parcelado */}
+        {/* Dia de Vencimento — visível apenas quando parcelado */}
         {parseInt(parcelas || '1') > 1 && (
           <TextField
             fullWidth
-            label="Data de Vencimento da 1ª Parcela"
-            type="date"
-            value={dataPrimeiraParcela}
-            onChange={(e) => setDataPrimeiraParcela(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            inputProps={{ min: new Date().toISOString().split('T')[0] }}
+            label="Dia de Vencimento"
+            type="number"
+            value={diaVencimento}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '' || (Number(val) >= 1 && Number(val) <= 31)) {
+                setDiaVencimento(val);
+              }
+            }}
+            inputProps={{ min: 1, max: 31 }}
+            helperText="Informe o dia do mês para vencimento de todas as parcelas (1 a 31)."
             sx={{ mb: 2 }}
           />
         )}

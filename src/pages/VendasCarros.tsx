@@ -37,6 +37,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArticleIcon from '@mui/icons-material/Article';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { Tooltip } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatters';
@@ -169,20 +170,25 @@ const VendasCarros = () => {
   const [contratoDialogVendaId, setContratoDialogVendaId] = useState('');
   const [contratoDialogClienteNome, setContratoDialogClienteNome] = useState('');
 
-  // Estado para o carnê: qtd de parcelas e data da 1ª parcela (capturados no dialog de gerar)
+  // Estado para o carnê: qtd de parcelas e dia de vencimento (capturados no dialog de gerar)
   const [carneQtd, setCarneQtd] = useState('');
-  const [carneData, setCarneData] = useState(new Date().toISOString().split('T')[0]);
+  const [carneDiaVencimento, setCarneDiaVencimento] = useState('10');
   const [carneDialogOpen, setCarneDialogOpen] = useState(false);
   const [carneVendaIdPendente, setCarneVendaIdPendente] = useState<string | null>(null);
 
   // Estado para o modal de parcelas (detalhes de uma venda)
   const [parcelasModalOpen, setParcelasModalOpen] = useState(false);
   const [parcelasModalLoading, setParcelasModalLoading] = useState(false);
+  const [parcelasModalVendaId, setParcelasModalVendaId] = useState<string | null>(null);
   const [parcelasModalData, setParcelasModalData] = useState<Array<{
     id: string; numero_parcela: number; valor: number;
     data_vencimento: string; status: string; data_pagamento: string | null;
   }>>([]);
   const [parcelasModalTitulo, setParcelasModalTitulo] = useState('');
+
+  // Estado para confirmação de cancelamento da venda
+  const [confirmCancelVendaOpen, setConfirmCancelVendaOpen] = useState(false);
+  const [cancelingVenda, setCancelingVenda] = useState(false);
 
   const MENSAGEM_CONFIRMAR_SEM_DOCUMENTO = 'Este cliente não possui CNH/Documento anexado. Deseja continuar com a venda e gerar o contrato mesmo assim?';
 
@@ -342,7 +348,7 @@ const VendasCarros = () => {
 
     // Abre dialog para capturar dados do carnê antes de gerar o contrato
     setCarneQtd(String(venda?.parcelas ?? 1));
-    setCarneData(new Date().toISOString().split('T')[0]);
+    setCarneDiaVencimento('10');
     setCarneVendaIdPendente(vendaId);
     setCarneDialogOpen(true);
   };
@@ -359,7 +365,7 @@ const VendasCarros = () => {
         documentoVerificado: true,
         // Dados do carnê de parcelas
         quantidadeParcelas: qtdParcelas > 1 ? qtdParcelas : 0,
-        dataPrimeiraParcela: qtdParcelas > 1 ? carneData : null,
+        diaVencimento: qtdParcelas > 1 ? parseInt(carneDiaVencimento || '10', 10) : null,
       });
       const venda = vendasCarros.find(v => v.id === vendaId);
       await fetchVendasCarros();
@@ -373,6 +379,31 @@ const VendasCarros = () => {
         message: 'Erro ao gerar contrato da venda.',
         severity: 'error',
       });
+    }
+  };
+
+  const handleCancelarVenda = async () => {
+    if (!parcelasModalVendaId) return;
+    try {
+      setCancelingVenda(true);
+      await axios.post(`/api/vendas_carros/${parcelasModalVendaId}/cancel`);
+      setConfirmCancelVendaOpen(false);
+      setParcelasModalOpen(false);
+      await fetchVendasCarros();
+      setSnackbar({
+        open: true,
+        message: 'Venda cancelada com sucesso! O veículo retornou para o estoque e parcelas pendentes foram canceladas.',
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar venda:', error);
+      setSnackbar({
+        open: true,
+        message: 'Erro ao cancelar venda. Tente novamente.',
+        severity: 'error',
+      });
+    } finally {
+      setCancelingVenda(false);
     }
   };
 
@@ -858,6 +889,7 @@ const VendasCarros = () => {
                           title="Ver parcelas desta venda"
                           onClick={async (e) => {
                             e.stopPropagation();
+                            setParcelasModalVendaId(vendaCarro.id);
                             setParcelasModalTitulo(`${vendaCarro.clienteNome || 'Cliente'} — ${vendaCarro.fabricante} ${vendaCarro.modelo}`);
                             setParcelasModalOpen(true);
                             setParcelasModalLoading(true);
@@ -1247,11 +1279,17 @@ const VendasCarros = () => {
           {parseInt(carneQtd || '1') > 1 && (
             <TextField
               fullWidth
-              label="Data de Vencimento da 1ª Parcela"
-              type="date"
-              value={carneData}
-              onChange={e => setCarneData(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+              label="Dia de Vencimento das Parcelas"
+              type="number"
+              value={carneDiaVencimento}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === '' || (Number(val) >= 1 && Number(val) <= 31)) {
+                  setCarneDiaVencimento(val);
+                }
+              }}
+              inputProps={{ min: 1, max: 31 }}
+              helperText="Dia do mês fixo para todas as parcelas (1 a 31)."
             />
           )}
         </DialogContent>
@@ -1344,8 +1382,49 @@ const VendasCarros = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setParcelasModalOpen(false)} color="inherit">Fechar</Button>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<CancelIcon />}
+            onClick={() => setConfirmCancelVendaOpen(true)}
+          >
+            Cancelar Venda
+          </Button>
+          <Button onClick={() => setParcelasModalOpen(false)} color="inherit">
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ══ Dialog: Confirmar Cancelamento de Venda ══ */}
+      <Dialog open={confirmCancelVendaOpen} onClose={() => setConfirmCancelVendaOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CancelIcon color="error" /> Confirmar Cancelamento
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 1.5 }}>
+            Tem certeza que deseja <strong>cancelar esta venda</strong>?
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            • O veículo vinculado retornará ao estoque como <strong>disponível</strong>.<br />
+            • As parcelas <strong>futuras/pendentes</strong> serão canceladas.<br />
+            • Parcelas já pagas serão mantidas para histórico financeiro.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setConfirmCancelVendaOpen(false)} color="inherit" disabled={cancelingVenda}>
+            Voltar
+          </Button>
+          <Button
+            onClick={handleCancelarVenda}
+            variant="contained"
+            color="error"
+            disabled={cancelingVenda}
+            startIcon={cancelingVenda ? <CircularProgress size={16} color="inherit" /> : <CancelIcon />}
+          >
+            {cancelingVenda ? 'Cancelando...' : 'Confirmar Cancelamento'}
+          </Button>
         </DialogActions>
       </Dialog>
 

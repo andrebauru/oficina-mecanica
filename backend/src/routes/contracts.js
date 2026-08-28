@@ -58,6 +58,26 @@ function sanitizeFileNamePart(value) {
     .slice(0, 80) || 'Cliente';
 }
 
+/**
+ * Calcula a data de vencimento da parcela fixando o dia escolhido para todos os meses subsequentes.
+ * Prevenção do Bug do Dia 31: Se o dia escolhido for 31 e o mês seguinte for Fevereiro (28/29) ou Abril/Junho/Set/Nov (30),
+ * o vencimento trava rigorosamente no último dia válido do mês correspondente.
+ */
+function calcVencimentoPorDiaFixo(diaFixo, offsetMeses, dataBase = new Date()) {
+  const baseAno = dataBase.getFullYear();
+  const baseMes = dataBase.getMonth(); // 0-indexed
+  const targetMonthIndex = baseMes + offsetMeses;
+  const targetYear = baseAno + Math.floor(targetMonthIndex / 12);
+  const targetMonth = ((targetMonthIndex % 12) + 12) % 12; // 0-indexed
+  const lastDayOfMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const day = Math.min(Math.max(1, parseInt(diaFixo || 10, 10)), lastDayOfMonth);
+  const dt = new Date(Date.UTC(targetYear, targetMonth, day, 12, 0, 0));
+  return {
+    dateObj: dt,
+    dateStr: dt.toISOString().split('T')[0],
+  };
+}
+
 async function getOptionalClientDocument(clientId) {
   if (!clientId) return null;
 
@@ -168,11 +188,7 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
 
     // Campos do carnê de parcelas (body ou fallback para a venda existente)
     const quantidadeParcelas = parseInt(req.body.quantidadeParcelas ?? venda.parcelas ?? 1, 10);
-    const dataPrimeiraParcela = req.body.dataPrimeiraParcela || (() => {
-      const d = new Date();
-      d.setMonth(d.getMonth() + 1);
-      return d.toISOString().split('T')[0];
-    })();
+    const diaVencimento = parseInt(req.body.diaVencimento || (req.body.dataPrimeiraParcela ? req.body.dataPrimeiraParcela.split('-')[2] : 10), 10);
 
     const clienteRows = venda.clienteId
       ? await query('SELECT * FROM clientes WHERE id = ? LIMIT 1', [venda.clienteId])
@@ -217,33 +233,18 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────────────────
 
-    // ─── Calcular e persistir parcelas (se parcelado) ─────────────────────────
+    // ─── Calcular e persistir parcelas com Dia Fixo de Vencimento ─────────────
     let parcelasParaCarne = [];
-    if (quantidadeParcelas >= 1 && dataPrimeiraParcela) {
+    if (quantidadeParcelas >= 1) {
       // Limpar parcelas anteriores da mesma venda para não duplicar
       await query('DELETE FROM vendas_parcelas WHERE contrato_id = ?', [vendaId]).catch(() => {});
 
-      const [ano, mes, dia] = dataPrimeiraParcela.split('-').map(Number);
       const valorBaseParcelas = valorFinanciado > 0 ? valorFinanciado : valorTotal;
       const valorParcela = valorBaseParcelas > 0 ? parseFloat((valorBaseParcelas / quantidadeParcelas).toFixed(2)) : 0;
 
-      /**
-       * Calcula a data de vencimento da parcela N (base 0).
-       * Resolve o "Bug do Dia 31": se o dia original não existir no mês alvo,
-       * trava no último dia válido daquele mês (ex: 31/jan + 1mês → 28/fev, não 03/mar).
-       */
-      function calcVencimento(baseAno, baseMes, baseDia, offsetMeses) {
-        const targetMonth = baseMes - 1 + offsetMeses; // 0-indexed
-        const targetYear  = baseAno + Math.floor(targetMonth / 12);
-        const targetMon   = ((targetMonth % 12) + 12) % 12; // 0-indexed, sem negativo
-        const lastDay     = new Date(targetYear, targetMon + 1, 0).getDate();
-        const day         = Math.min(baseDia, lastDay);
-        return new Date(targetYear, targetMon, day);
-      }
-
       for (let i = 0; i < quantidadeParcelas; i++) {
-        const dtVenc   = calcVencimento(ano, mes, dia, i);
-        const dtStr    = dtVenc.toISOString().split('T')[0];
+        // Fixa o dia escolhido para cada mês subsequente (1º mês = hoje + 1 mês, etc.)
+        const { dateObj, dateStr } = calcVencimentoPorDiaFixo(diaVencimento, i + 1);
         const parcelaId = uuidv4();
 
         await query(
@@ -256,13 +257,13 @@ router.post('/vendas_carros/:vendaId/contracts/generate', async (req, res) => {
             venda.clienteId || null,
             i + 1,
             valorParcela,
-            dtStr,
+            dateStr,
           ]
         );
 
         parcelasParaCarne.push({
           numero: i + 1,
-          data_vencimento: dtVenc,
+          data_vencimento: dateObj,
           valor: valorParcela,
         });
       }
@@ -473,32 +474,21 @@ router.post('/contracts/generate', async (req, res) => {
       ]
     );
 
-    // Criar parcelas automaticamente
+    // Criar parcelas automaticamente com Dia Fixo de Vencimento
+    const diaVencimento = parseInt(req.body.diaVencimento || (req.body.dataPrimeiraParcela ? req.body.dataPrimeiraParcela.split('-')[2] : 10), 10);
     const parcelasArray = [];
     const restante = precoNum - sinalNum;
     const valorParcela = parcelasNum > 0 ? (restante / parcelasNum).toFixed(2) : 0;
 
-    // Adicionar sinal como primeira parcela (se houver)
-    if (sinalNum > 0) {
-      parcelasArray.push({
-        numero: 0,
-        descricao: 'Sinal',
-        valor: sinalNum,
-        datavencimento: new Date().toISOString().split('T')[0],
-        status: 'pendente'
-      });
-    }
-
-    // Criar parcelas futuras (30 dias cada)
+    // Criar parcelas futuras fixando o dia do mês
     for (let i = 1; i <= parcelasNum; i++) {
-      const dataVencimento = new Date();
-      dataVencimento.setDate(dataVencimento.getDate() + (i * 30));
+      const { dateStr } = calcVencimentoPorDiaFixo(diaVencimento, i);
 
       parcelasArray.push({
         numero: i,
         descricao: `Parcela ${i}/${parcelasNum}`,
         valor: parseFloat(valorParcela),
-        datavencimento: dataVencimento.toISOString().split('T')[0],
+        datavencimento: dateStr,
         status: 'pendente'
       });
     }
@@ -935,6 +925,72 @@ router.get('/parcelas/mes/:ano/:mes', async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar parcelas do mês:', error);
     return res.status(500).json({ message: 'Erro ao buscar parcelas do mês', error: error.message });
+  }
+});
+
+/**
+ * POST /api/vendas_carros/:vendaId/cancel
+ * Cancela uma venda de veículo:
+ * 1. Retorna o status do carro para 'disponivel' na tabela veiculos
+ * 2. Deleta/cancela as parcelas pendentes (mantendo as pagas para histórico)
+ * 3. Marca a venda como 'cancelado' ou remove o registro
+ */
+router.post('/vendas_carros/:vendaId/cancel', async (req, res) => {
+  try {
+    const { vendaId } = req.params;
+
+    // 1. Buscar a venda
+    const rows = await query('SELECT * FROM vendas_carros WHERE id = ? LIMIT 1', [vendaId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Venda não encontrada' });
+    }
+    const venda = rows[0];
+
+    // 2. Liberar o veículo na tabela veiculos (voltar status para 'disponivel')
+    try {
+      if (venda.veiculo_id || venda.veiculoId) {
+        await query(
+          "UPDATE veiculos SET status = 'disponivel' WHERE id = ?",
+          [venda.veiculo_id || venda.veiculoId]
+        );
+      } else if (venda.fabricante && venda.modelo) {
+        await query(
+          "UPDATE veiculos SET status = 'disponivel' WHERE marca = ? AND modelo = ? AND status = 'vendido' LIMIT 1",
+          [venda.fabricante, venda.modelo]
+        );
+      }
+    } catch (veicErr) {
+      console.warn('[vendas_carros:cancel] Aviso ao liberar veículo:', veicErr?.message);
+    }
+
+    // 3. Deletar/cancelar parcelas futuras que ainda NÃO foram pagas (manter pagas para histórico financeiro)
+    await query(
+      "DELETE FROM vendas_parcelas WHERE contrato_id = ? AND status != 'pago'",
+      [vendaId]
+    ).catch(() => {});
+
+    await query(
+      "DELETE FROM parcelas WHERE venda_id = ? AND status != 'pago'",
+      [vendaId]
+    ).catch(() => {});
+
+    // 4. Marcar venda como cancelada ou remover registro principal
+    try {
+      await query(
+        "UPDATE vendas_carros SET status = 'cancelado', updated_at = NOW() WHERE id = ?",
+        [vendaId]
+      );
+    } catch {
+      await query('DELETE FROM vendas_carros WHERE id = ?', [vendaId]);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Venda cancelada com sucesso. Veículo disponível no estoque e parcelas pendentes canceladas.',
+    });
+  } catch (error) {
+    console.error('[POST /api/vendas_carros/:vendaId/cancel] Erro:', error);
+    return res.status(500).json({ message: 'Erro ao cancelar venda', error: error.message });
   }
 });
 
