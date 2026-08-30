@@ -91,8 +91,8 @@ function buildInstallments(venda) {
 function contractTemplateByLanguage(language = 'pt') {
   const basePtClauses = [
     {
-      title: '所有権留保および譲渡等の禁止 / Reserva de Domínio e Proibição de Repasse',
-      paragraphs: ['Reserva de Domínio e Proibição de Repasse: Sob o Código Civil Japonês (Minpo), o veículo permanecerá alienado à Hirata Cars Shop até a quitação integral. É proibido revender, alugar ou repassar a terceiros antes da quitação.']
+      title: '所有権留保および強制執行 / Reserva de Domínio e Execução Forçada',
+      paragraphs: ['Reserva de Domínio e Execução Forçada (Jiriki kyusai & Kosei Shosho): Nos termos do Código Civil Japonês (民法 - Minpo), o veículo permanece sob propriedade da Hirata Cars Shop (Reserva de Domínio) até a quitação integral. O atraso de qualquer parcela superior a 30 dias constitui quebra contratual, conferindo à Vendedora o direito de retomar a posse imediata do veículo. O Comprador concorda expressamente com a Execução Forçada (強制執行認諾 - Kyōsei shikkō nindaku), isentando a Vendedora de processos judiciais prévios para a retomada do bem em caso de inadimplência, autorizando o registro deste instrumento como Escritura Pública (Kosei Shosho). É proibido revender, alugar ou repassar a terceiros antes da quitação.']
     },
     {
       title: '登録情報の変更通知 / Atualização de Dados',
@@ -121,17 +121,13 @@ function contractTemplateByLanguage(language = 'pt') {
     {
       title: '事故や過失による全損 / Perda Total',
       paragraphs: ['Perda Total: Perda total por acidente ou negligência não isenta o COMPRADOR de quitar a dívida restante.']
-    },
-    {
-      title: '支払遅延および車両の引き揚げ / Atraso e Retomada',
-      paragraphs: ['Atraso e Retomada: Inadimplência superior a 3 meses garante à Hirata Cars Shop o direito de retomada do veículo sem devolução de valores.']
     }
   ];
 
   const jaClauses = [
     {
-      title: '所有権留保および譲渡等の禁止 / Reserva de Domínio e Proibição de Repasse',
-      paragraphs: ['所有権留保および譲渡等の禁止: 日本国民法に基づき、本契約の対象車両の所有権は、全額の支払いが完了するまでHirata Cars Shopに留保されます。買主は、代金の完済前に、車両の転売、貸与、譲渡、第三者への引き渡し、または国外への持ち出しを行うことを固く禁じられます。']
+      title: '所有権留保および強制執行 / Reserva de Domínio e Execução Forçada',
+      paragraphs: ['所有権留保および強制執行: 日本国民法（民法）に基づき、本契約の対象車両の所有権は、代金が完済されるまでHirata Cars Shopに留保されます（所有権留保）。いずれかの分割払いの支払いが30日を超えて遅延した場合、契約違反となり、売主は直ちに車両の占有を回収する権利を有します。買主は強制執行認諾約款（強制執行認諾）に明示的に同意し、不履行が発生した場合における車両の回収について事前の裁判手続を免除し、本契約を公正証書として作成・執行することを承諾します。また、代金完済前の転売・譲渡・貸与を固く禁じます。']
     },
     {
       title: '登録情報の変更通知 / Atualização de Dados',
@@ -142,7 +138,7 @@ function contractTemplateByLanguage(language = 'pt') {
       paragraphs: ['車両の現状および保証: 本契約の対象車両は「中古車」として現状渡しで販売されます。引き渡し日から3ヶ月間、エンジンおよびトランスミッションの機能的欠陥に限定して保証を提供します。']
     },
     {
-      title: '引渡後の責任および交通法規 of 遵守 / Responsabilidade e Leis de Trânsito', // Custom override
+      title: '引渡後の責任および交通法規の遵守 / Responsabilidade e Leis de Trânsito',
       paragraphs: ['引渡後の責任および交通法規の遵守: 買主は、車両引き渡し日以降、交通違反、事故、または損害について全責任を負います。']
     },
     {
@@ -160,10 +156,6 @@ function contractTemplateByLanguage(language = 'pt') {
     {
       title: '事故や過失による全損 / Perda Total',
       paragraphs: ['事故や過失による全損: 事故や「全損」となった場合でも、買主の支払い義務は免除されません。']
-    },
-    {
-      title: '支払遅延および車両の引き揚げ / Atraso e Retomada',
-      paragraphs: ['支払遅延および車両の引き揚げ: 支払いが3ヶ月以上滞った場合、Hirata Cars Shopは事前の通知なく直ちに車両を引き揚げる権利を有し、返金は一切行われません。']
     }
   ];
 
@@ -771,21 +763,20 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
         const venc = p.data_vencimento || p.data || p.datavencimento;
         return `
         <tr style="${i % 2 === 0 ? 'background:#f8fafc;' : 'background:#fff;'}">
-          <td style="padding:7px 10px; text-align:center; font-weight:700; border:1px solid #cbd5e1;">${num}</td>
-          <td style="padding:7px 10px; text-align:center; border:1px solid #cbd5e1;">${fmtDate(venc)}</td>
-          <td style="padding:7px 10px; text-align:right; font-weight:700; border:1px solid #cbd5e1;">${currency(p.valor)}</td>
-          <td style="padding:7px 10px; text-align:center; border:1px solid #cbd5e1;">
+          <td style="padding:8px 12px; text-align:center; font-weight:700; border:1px solid #cbd5e1;">${num}ª</td>
+          <td style="padding:8px 12px; text-align:center; border:1px solid #cbd5e1; font-weight:600;">${fmtDate(venc)}</td>
+          <td style="padding:8px 12px; text-align:right; font-weight:700; color:#15803d; border:1px solid #cbd5e1;">${currency(p.valor)}</td>
+          <td style="padding:8px 12px; text-align:center; border:1px solid #cbd5e1;">
             <span style="
               display:inline-block;
-              width:15px; height:15px;
-              border:2px solid #374151;
+              width:16px; height:16px;
+              border:2px solid #475569;
               border-radius:3px;
               vertical-align:middle;
               margin-right:6px;
             "></span>
-            <span style="font-size:11px; font-weight:600;">[ &nbsp; ] Pago / 支払済</span>
+            <span style="font-size:11px; font-weight:700; color:#334155;">[ &nbsp; ] Pago / 支払済</span>
           </td>
-          <td style="padding:7px 10px; border:1px solid #cbd5e1; height:32px;"></td>
         </tr>`;
       }
     )
@@ -798,27 +789,27 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
       font-family: 'Noto Sans JP', 'Helvetica Neue', Arial, sans-serif;
       font-size: 11px;
       color: #111;
-      padding: 10px 0;
+      padding: 15px 0;
       width: 100%;
     ">
       <!-- Cabeçalho do Carnê -->
       <div style="
         text-align: center;
         border-bottom: 3px solid #1e293b;
-        padding-bottom: 10px;
-        margin-bottom: 16px;
+        padding-bottom: 12px;
+        margin-bottom: 18px;
       ">
-        <h2 style="margin:0 0 4px; font-size:18px; font-weight:800; color:#1e293b; letter-spacing:0.5px;">
+        <h2 style="margin:0 0 6px; font-size:20px; font-weight:800; color:#1e293b; letter-spacing:0.5px;">
           分割払い手帳 / CARNÊ DE PARCELAS
         </h2>
-        <p style="margin:4px 0 0; font-size:11px; color:#374151;">
+        <p style="margin:4px 0 0; font-size:12px; color:#374151;">
           Cliente / 買主: <strong>${escapeHtml(clienteNome || '—')}</strong>
           &nbsp;&nbsp;|&nbsp;&nbsp;
           Veículo / 車両: <strong>${escapeHtml(veiculoInfo || '—')}</strong>
         </p>
       </div>
 
-      <!-- Tabela de Parcelas -->
+      <!-- Tabela do Carnê: Parcela | Vencimento | Valor | [ ] Pago -->
       <table style="
         width: 100%;
         border-collapse: collapse;
@@ -828,11 +819,10 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
       ">
         <thead>
           <tr style="background:#1e293b; color:#fff;">
-            <th style="padding:8px 10px; text-align:center; font-size:11px; width:45px; border:1px solid #334155;">Nº</th>
-            <th style="padding:8px 10px; text-align:center; font-size:11px; border:1px solid #334155;">Vencimento / 支払期日</th>
-            <th style="padding:8px 10px; text-align:right;  font-size:11px; border:1px solid #334155;">Valor / 金額</th>
-            <th style="padding:8px 10px; text-align:center; font-size:11px; border:1px solid #334155;">Situação / 状況</th>
-            <th style="padding:8px 10px; text-align:left;   font-size:11px; width:150px; border:1px solid #334155;">Assinatura / 署名・印</th>
+            <th style="padding:10px 12px; text-align:center; font-size:11px; width:70px; border:1px solid #334155;">Parcela / 回数</th>
+            <th style="padding:10px 12px; text-align:center; font-size:11px; border:1px solid #334155;">Vencimento / 支払期日</th>
+            <th style="padding:10px 12px; text-align:right;  font-size:11px; border:1px solid #334155;">Valor / 金額</th>
+            <th style="padding:10px 12px; text-align:center; font-size:11px; width:180px; border:1px solid #334155;">Situação / 状況</th>
           </tr>
         </thead>
         <tbody>
@@ -840,13 +830,35 @@ function buildCarneHtml(parcelas, clienteNome, veiculoInfo) {
         </tbody>
       </table>
 
-      <!-- Rodapé do Carnê -->
-      <div style="margin-top:20px; padding:10px; background:#f1f5f9; border-radius:4px; border:1px solid #e2e8f0; text-align:center;">
+      <!-- Aviso Legal do Carnê -->
+      <div style="margin-top:18px; padding:10px 14px; background:#f8fafc; border-radius:4px; border:1px solid #e2e8f0; text-align:center;">
         <p style="margin:0; font-size:10px; color:#475569; line-height:1.4;">
-          Este carnê é um documento auxiliar de controle financeiro. O contrato de compra e venda prevalece em caso de divergência.
+          Este carnê é parte integrante do Contrato de Compra e Venda com Reserva de Domínio e Cláusula de Execução Forçada (Kosei Shosho).
           <br/>
-          このカルネは支払管理のための補助書類です。相違がある場合は売買契約書が優先されます。
+          このカルネは所有権留保および強制執行認諾条項付き売買契約書の不可分の一部です。
         </p>
+      </div>
+
+      <!-- Área de Assinaturas no Rodapé do Carnê -->
+      <div style="margin-top: 45px; display: flex; justify-content: space-between; gap: 40px; padding: 0 15px;">
+        <div style="flex: 1; text-align: center;">
+          <div style="border-top: 1.5px solid #334155; margin-bottom: 6px;"></div>
+          <div style="font-size: 11px; font-weight: bold; color: #1e293b;">
+            Hirata Cars Shop
+          </div>
+          <div style="font-size: 10px; color: #64748b;">
+            (Vendedor - Hirata Cars / 売主)
+          </div>
+        </div>
+        <div style="flex: 1; text-align: center;">
+          <div style="border-top: 1.5px solid #334155; margin-bottom: 6px;"></div>
+          <div style="font-size: 11px; font-weight: bold; color: #1e293b;">
+            ${escapeHtml(clienteNome || 'Comprador')}
+          </div>
+          <div style="font-size: 10px; color: #64748b;">
+            (Comprador - Ciente dos Vencimentos / 買主・支払期日確認済)
+          </div>
+        </div>
       </div>
     </div>
   `;

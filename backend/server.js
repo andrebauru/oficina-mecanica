@@ -2030,6 +2030,60 @@ app.post('/api/vendas_carros/:vendaId/parcelas/:numero/toggle', safeRoute(async 
   return res.json({ ok: true, vendaId, numeroParcela: numParcela, status: novoStatus });
 }));
 
+// DELETE /api/vendas_carros/:id — Exclusão em CASCATA (Deleta parcelas, libera veículo e apaga venda)
+app.delete('/api/vendas_carros/:id', safeRoute(async (req, res) => {
+  const { id } = req.params;
+  const vendaRows = await query('SELECT * FROM vendas_carros WHERE id = ? LIMIT 1', [id]).catch(() => []);
+  if (!vendaRows.length) {
+    return res.status(404).json({ message: 'Venda de carro não encontrada' });
+  }
+  const venda = vendaRows[0];
+
+  try {
+    // 1. Deletar parcelas correspondentes em vendas_parcelas (evita dados órfãos)
+    await query('DELETE FROM vendas_parcelas WHERE contrato_id = ?', [id]);
+
+    // 2. Deletar parcelas correspondentes na tabela legada parcelas
+    await query('DELETE FROM parcelas WHERE venda_id = ?', [id]);
+
+    // 3. Liberar veículo vinculado na tabela veiculos
+    if (venda.veiculo_id || venda.veiculoId) {
+      await query("UPDATE veiculos SET status = 'disponivel' WHERE id = ?", [venda.veiculo_id || venda.veiculoId]).catch(() => {});
+    } else if (venda.fabricante && venda.modelo) {
+      await query("UPDATE veiculos SET status = 'disponivel' WHERE marca = ? AND modelo = ? AND status = 'vendido' LIMIT 1", [venda.fabricante, venda.modelo]).catch(() => {});
+    }
+
+    // 4. Deletar documentos de contrato vinculados
+    await query("DELETE FROM client_documents WHERE document_type = 'contrato_venda' AND (id = ? OR original_filename LIKE ?)", [id, `%${id}%`]).catch(() => {});
+
+    // 5. Deletar registro principal da venda
+    await query('DELETE FROM vendas_carros WHERE id = ?', [id]);
+
+    return res.json({
+      success: true,
+      message: 'Venda e todas as suas parcelas foram excluídas com sucesso. Veículo disponível no estoque.',
+      id,
+    });
+  } catch (err) {
+    console.error('[DELETE /api/vendas_carros/:id] Erro na exclusão em cascata:', err);
+    return res.status(500).json({ message: 'Erro ao excluir venda e parcelas', error: err.message });
+  }
+}));
+
+// DELETE /api/vendas/:id — Exclusão em cascata para vendas legadas
+app.delete('/api/vendas/:id', safeRoute(async (req, res) => {
+  const { id } = req.params;
+  try {
+    await query('DELETE FROM parcelas WHERE venda_id = ?', [id]);
+    await query('DELETE FROM vendas_parcelas WHERE contrato_id = ?', [id]);
+    await query('DELETE FROM vendas WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Venda excluída com sucesso', id });
+  } catch (err) {
+    console.error('[DELETE /api/vendas/:id] Erro:', err);
+    return res.status(500).json({ message: 'Erro ao excluir venda', error: err.message });
+  }
+}));
+
 // =============================================================================
 Object.entries(ENTITY_ROUTES).forEach(([resource, entityDef]) => {
   // Pular recursos com rotas customizadas
@@ -2079,12 +2133,37 @@ app.use((error, _req, res, _next) => {
   });
 });
 
+// Limpa dados órfãos (faturas fantasmas de vendas que foram excluídas no passado)
+async function limparDadosOrfaos() {
+  try {
+    await query(`
+      DELETE FROM vendas_parcelas 
+      WHERE contrato_id IS NOT NULL 
+        AND contrato_id != ''
+        AND contrato_id NOT IN (SELECT id FROM vendas_carros)
+        AND contrato_id NOT IN (SELECT id FROM client_documents)
+    `);
+    await query(`
+      DELETE FROM parcelas 
+      WHERE venda_id IS NOT NULL 
+        AND venda_id != ''
+        AND venda_id NOT IN (SELECT id FROM vendas)
+        AND venda_id NOT IN (SELECT id FROM vendas_carros)
+    `);
+    console.log('[AutoCleanup] Limpeza de dados órfãos (faturas fantasmas) concluída com sucesso.');
+  } catch (e) {
+    console.warn('[AutoCleanup] Aviso na limpeza de dados órfãos:', e.message);
+  }
+}
+
 app.listen(env.apiPort, async () => {
   try {
     await testConnection();
     console.log(`Backend MySQL ativo na porta ${env.apiPort}`);
     // Garante que as colunas de SendGrid existam na tabela de configurações
     await garantirColunasEmailNaConfiguracao().catch((e) => console.warn('[AutoMigration] Aviso:', e.message));
+    // Limpa dados órfãos residuais
+    await limparDadosOrfaos();
     // Ativa o alarme do domingo para emails semanais de contas a receber
     ativarCronEmailDomingo();
   } catch (error) {
